@@ -97,6 +97,8 @@ Documentation about the current state of the system - architecture, tech stack, 
 - Security best practices
 - Error handling & retry logic
 
+**[adoption-stats-export-api.md](./System/adoption-stats-export-api.md)** - Control Tower Adoption Stats Export (provider API for Main CT)
+
 **[vector-embeddings-system.md](./System/vector-embeddings-system.md)** - Vector Embeddings Architecture
 - OpenAI embeddings integration
 - pgvector implementation

@@ -100,6 +100,7 @@ import PodsPage from "./pages/adminpanel/control-tower/PodsPage";
 import PodDetailPage from "./pages/adminpanel/control-tower/PodDetailPage";
 import MeetingsPage from "./pages/adminpanel/control-tower/MeetingsPage";
 import ActiveCollabSyncDashboard from "./pages/adminpanel/data-sync/ActiveCollabSyncDashboard";
+import { ActivityTrackerProvider } from "@/contexts/ActivityTrackerContext";
 
 // Quote Builder Module
 import ServiceCatalogPage from "./pages/adminpanel/quotes/ServiceCatalogPage";
@@ -142,6 +143,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ActivityTrackerProvider>
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -530,6 +532,7 @@ const App = () => (
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ActivityTrackerProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

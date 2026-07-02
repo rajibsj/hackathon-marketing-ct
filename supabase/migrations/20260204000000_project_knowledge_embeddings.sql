@@ -58,7 +58,7 @@ ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
 COMMENT ON COLUMN public.project_knowledge_files.processing_status IS
 'Job status: pending (waiting), processing (in progress), completed (done), failed (error - will retry)';
 
--- Create index for processing queue
+-- CREATE INDEX IF NOT EXISTS for processing queue
 CREATE INDEX IF NOT EXISTS idx_project_knowledge_files_processing_queue
 ON public.project_knowledge_files (processing_status, retry_count, created_at)
 WHERE processing_status IN ('pending', 'failed');
@@ -121,6 +121,7 @@ AS $$
 $$;
 
 -- RLS policy for viewing project embeddings
+DROP POLICY IF EXISTS "Users can view project embeddings" ON public.project_knowledge_embeddings;
 CREATE POLICY "Users can view project embeddings" ON public.project_knowledge_embeddings
   FOR SELECT USING (
     user_has_project_access(auth.uid(), project_id)
@@ -129,6 +130,7 @@ CREATE POLICY "Users can view project embeddings" ON public.project_knowledge_em
   );
 
 -- RLS policy for managing project embeddings
+DROP POLICY IF EXISTS "Users can manage project embeddings" ON public.project_knowledge_embeddings;
 CREATE POLICY "Users can manage project embeddings" ON public.project_knowledge_embeddings
   FOR ALL USING (
     user_has_project_access(auth.uid(), project_id)
@@ -207,6 +209,7 @@ GRANT EXECUTE ON FUNCTION user_has_project_access TO service_role;
 -- 6. Create updated_at trigger for embeddings table
 -- ─────────────────────────────────────────────────────────────────
 
+DROP TRIGGER IF EXISTS update_project_knowledge_embeddings_updated_at ON public.project_knowledge_embeddings;
 CREATE TRIGGER update_project_knowledge_embeddings_updated_at
   BEFORE UPDATE ON public.project_knowledge_embeddings
   FOR EACH ROW

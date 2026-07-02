@@ -1,5 +1,5 @@
 -- Create accountability chart table
-CREATE TABLE public.user_accountability_chart (
+CREATE TABLE IF NOT EXISTS public.user_accountability_chart (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   serial_number INTEGER NOT NULL,
@@ -14,12 +14,14 @@ CREATE TABLE public.user_accountability_chart (
 ALTER TABLE public.user_accountability_chart ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own accountability chart
+DROP POLICY IF EXISTS "Users can view their own accountability chart" ON public.user_accountability_chart;
 CREATE POLICY "Users can view their own accountability chart"
   ON public.user_accountability_chart
   FOR SELECT
   USING (user_id = auth.uid());
 
 -- RLS Policy: Users can manage their own accountability chart
+DROP POLICY IF EXISTS "Users can manage their own accountability chart" ON public.user_accountability_chart;
 CREATE POLICY "Users can manage their own accountability chart"
   ON public.user_accountability_chart
   FOR ALL
@@ -27,6 +29,7 @@ CREATE POLICY "Users can manage their own accountability chart"
   WITH CHECK (user_id = auth.uid());
 
 -- RLS Policy: Managers can view all accountability charts
+DROP POLICY IF EXISTS "Managers can view all accountability charts" ON public.user_accountability_chart;
 CREATE POLICY "Managers can view all accountability charts"
   ON public.user_accountability_chart
   FOR SELECT
@@ -39,6 +42,7 @@ CREATE POLICY "Managers can view all accountability charts"
   );
 
 -- RLS Policy: Managers can manage all accountability charts
+DROP POLICY IF EXISTS "Managers can manage all accountability charts" ON public.user_accountability_chart;
 CREATE POLICY "Managers can manage all accountability charts"
   ON public.user_accountability_chart
   FOR ALL
@@ -58,11 +62,12 @@ CREATE POLICY "Managers can manage all accountability charts"
   );
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_user_accountability_chart_updated_at ON public.user_accountability_chart;
 CREATE TRIGGER update_user_accountability_chart_updated_at
   BEFORE UPDATE ON public.user_accountability_chart
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
--- Create index for better query performance
-CREATE INDEX idx_user_accountability_chart_user_id 
+-- CREATE INDEX IF NOT EXISTS for better query performance
+CREATE INDEX IF NOT EXISTS idx_user_accountability_chart_user_id 
   ON public.user_accountability_chart(user_id);

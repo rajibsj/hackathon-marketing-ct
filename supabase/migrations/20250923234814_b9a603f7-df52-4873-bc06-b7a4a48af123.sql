@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.brand_kpis (
 ALTER TABLE public.brand_kpis ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for brand_kpis
+DROP POLICY IF EXISTS "Super admins can manage all brand KPIs" ON public.brand_kpis;
 CREATE POLICY "Super admins can manage all brand KPIs" 
 ON public.brand_kpis 
 FOR ALL 
@@ -45,6 +46,7 @@ USING (EXISTS (
   AND users.role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Managers can view all brand KPIs" ON public.brand_kpis;
 CREATE POLICY "Managers can view all brand KPIs" 
 ON public.brand_kpis 
 FOR SELECT 
@@ -59,6 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_brand_kpis_brand_id ON public.brand_kpis(brand_id
 CREATE INDEX IF NOT EXISTS idx_brand_kpis_display_order ON public.brand_kpis(brand_id, display_order);
 
 -- Create trigger for brand_kpis updated_at
+DROP TRIGGER IF EXISTS update_brand_kpis_updated_at ON public.brand_kpis;
 CREATE TRIGGER update_brand_kpis_updated_at
   BEFORE UPDATE ON public.brand_kpis
   FOR EACH ROW

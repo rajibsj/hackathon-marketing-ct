@@ -15,6 +15,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- 3) Trigger on auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created_users ON auth.users;
+DROP TRIGGER IF EXISTS on_auth_user_created_users ON auth;
 CREATE TRIGGER on_auth_user_created_users
 AFTER INSERT ON auth.users
 FOR EACH ROW EXECUTE PROCEDURE public.handle_new_auth_user();

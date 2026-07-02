@@ -4,6 +4,8 @@
 -- This migration creates all tables for the Hackathon Module
 -- including employee management, events, teams, submissions, and judging
 
+CREATE EXTENSION IF NOT EXISTS citext;
+
 -- ================================================
 -- 1. EMPLOYEES TABLE
 -- ================================================
@@ -34,6 +36,7 @@ CREATE INDEX IF NOT EXISTS idx_employees_is_active ON public.employees(is_active
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for employees
+DROP POLICY IF EXISTS "Admins can manage all employees" ON public.employees;
 CREATE POLICY "Admins can manage all employees"
 ON public.employees FOR ALL
 TO authenticated
@@ -52,6 +55,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Authenticated users can view active employees" ON public.employees;
 CREATE POLICY "Authenticated users can view active employees"
 ON public.employees FOR SELECT
 TO authenticated
@@ -77,11 +81,13 @@ CREATE INDEX IF NOT EXISTS idx_employee_user_mapping_user ON public.employee_use
 ALTER TABLE public.employee_user_mapping ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own mapping" ON public.employee_user_mapping;
 CREATE POLICY "Users can view their own mapping"
 ON public.employee_user_mapping FOR SELECT
 TO authenticated
 USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins can manage all mappings" ON public.employee_user_mapping;
 CREATE POLICY "Admins can manage all mappings"
 ON public.employee_user_mapping FOR ALL
 TO authenticated
@@ -137,11 +143,13 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_events_dates ON public.hackathon_events
 ALTER TABLE public.hackathon_events ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Everyone can view open hackathons" ON public.hackathon_events;
 CREATE POLICY "Everyone can view open hackathons"
 ON public.hackathon_events FOR SELECT
 TO authenticated
 USING (status IN ('open', 'closed'));
 
+DROP POLICY IF EXISTS "Admins can manage hackathons" ON public.hackathon_events;
 CREATE POLICY "Admins can manage hackathons"
 ON public.hackathon_events FOR ALL
 TO authenticated
@@ -190,6 +198,7 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_participants_status ON public.hackathon
 ALTER TABLE public.hackathon_participants ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view participants for open events" ON public.hackathon_participants;
 CREATE POLICY "Users can view participants for open events"
 ON public.hackathon_participants FOR SELECT
 TO authenticated
@@ -200,6 +209,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Users can register themselves" ON public.hackathon_participants;
 CREATE POLICY "Users can register themselves"
 ON public.hackathon_participants FOR INSERT
 TO authenticated
@@ -211,12 +221,14 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Users can update their own participation" ON public.hackathon_participants;
 CREATE POLICY "Users can update their own participation"
 ON public.hackathon_participants FOR UPDATE
 TO authenticated
 USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Admins can manage participants" ON public.hackathon_participants;
 CREATE POLICY "Admins can manage participants"
 ON public.hackathon_participants FOR ALL
 TO authenticated
@@ -261,6 +273,7 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_teams_status ON public.hackathon_teams(
 ALTER TABLE public.hackathon_teams ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view teams for open events" ON public.hackathon_teams;
 CREATE POLICY "Users can view teams for open events"
 ON public.hackathon_teams FOR SELECT
 TO authenticated
@@ -271,12 +284,14 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Team leads can update their teams" ON public.hackathon_teams;
 CREATE POLICY "Team leads can update their teams"
 ON public.hackathon_teams FOR UPDATE
 TO authenticated
 USING (team_lead_id = auth.uid())
 WITH CHECK (team_lead_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can create teams for open events" ON public.hackathon_teams;
 CREATE POLICY "Users can create teams for open events"
 ON public.hackathon_teams FOR INSERT
 TO authenticated
@@ -288,6 +303,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Admins can manage all teams" ON public.hackathon_teams;
 CREATE POLICY "Admins can manage all teams"
 ON public.hackathon_teams FOR ALL
 TO authenticated
@@ -320,11 +336,13 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_team_members_participant ON public.hack
 ALTER TABLE public.hackathon_team_members ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view team members" ON public.hackathon_team_members;
 CREATE POLICY "Users can view team members"
 ON public.hackathon_team_members FOR SELECT
 TO authenticated
 USING (true);
 
+DROP POLICY IF EXISTS "Team leads can manage their team members" ON public.hackathon_team_members;
 CREATE POLICY "Team leads can manage their team members"
 ON public.hackathon_team_members FOR ALL
 TO authenticated
@@ -341,6 +359,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Admins can manage all team members" ON public.hackathon_team_members;
 CREATE POLICY "Admins can manage all team members"
 ON public.hackathon_team_members FOR ALL
 TO authenticated
@@ -391,6 +410,7 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_submissions_status ON public.hackathon_
 ALTER TABLE public.hackathon_submissions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Team members can view their submission" ON public.hackathon_submissions;
 CREATE POLICY "Team members can view their submission"
 ON public.hackathon_submissions FOR SELECT
 TO authenticated
@@ -403,6 +423,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Team leads can manage their submission" ON public.hackathon_submissions;
 CREATE POLICY "Team leads can manage their submission"
 ON public.hackathon_submissions FOR ALL
 TO authenticated
@@ -419,16 +440,7 @@ WITH CHECK (
   )
 );
 
-CREATE POLICY "Judges can view all submissions"
-ON public.hackathon_submissions FOR SELECT
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.hackathon_judges hj
-    WHERE hj.event_id = hackathon_submissions.event_id AND hj.user_id = auth.uid()
-  )
-);
-
+DROP POLICY IF EXISTS "Admins can manage all submissions" ON public.hackathon_submissions;
 CREATE POLICY "Admins can manage all submissions"
 ON public.hackathon_submissions FOR ALL
 TO authenticated
@@ -463,11 +475,13 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_judges_user ON public.hackathon_judges(
 ALTER TABLE public.hackathon_judges ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Everyone can view judges" ON public.hackathon_judges;
 CREATE POLICY "Everyone can view judges"
 ON public.hackathon_judges FOR SELECT
 TO authenticated
 USING (true);
 
+DROP POLICY IF EXISTS "Admins can manage judges" ON public.hackathon_judges;
 CREATE POLICY "Admins can manage judges"
 ON public.hackathon_judges FOR ALL
 TO authenticated
@@ -483,6 +497,17 @@ WITH CHECK (
     SELECT 1 FROM public.user_roles ur
     WHERE ur.user_id = auth.uid()
     AND ur.role IN ('super_admin', 'manager')
+  )
+);
+
+DROP POLICY IF EXISTS "Judges can view all submissions" ON public.hackathon_submissions;
+CREATE POLICY "Judges can view all submissions"
+ON public.hackathon_submissions FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.hackathon_judges hj
+    WHERE hj.event_id = hackathon_submissions.event_id AND hj.user_id = auth.uid()
   )
 );
 
@@ -523,6 +548,7 @@ CREATE INDEX IF NOT EXISTS idx_hackathon_scores_judge ON public.hackathon_scores
 ALTER TABLE public.hackathon_scores ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Judges can manage their own scores" ON public.hackathon_scores;
 CREATE POLICY "Judges can manage their own scores"
 ON public.hackathon_scores FOR ALL
 TO authenticated
@@ -539,6 +565,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Team members can view scores for their submission" ON public.hackathon_scores;
 CREATE POLICY "Team members can view scores for their submission"
 ON public.hackathon_scores FOR SELECT
 TO authenticated
@@ -552,6 +579,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Admins can view all scores" ON public.hackathon_scores;
 CREATE POLICY "Admins can view all scores"
 ON public.hackathon_scores FOR SELECT
 TO authenticated
@@ -577,21 +605,25 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Apply triggers
+DROP TRIGGER IF EXISTS employees_updated_at ON public.employees;
 CREATE TRIGGER employees_updated_at
 BEFORE UPDATE ON public.employees
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS hackathon_events_updated_at ON public.hackathon_events;
 CREATE TRIGGER hackathon_events_updated_at
 BEFORE UPDATE ON public.hackathon_events
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS hackathon_teams_updated_at ON public.hackathon_teams;
 CREATE TRIGGER hackathon_teams_updated_at
 BEFORE UPDATE ON public.hackathon_teams
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS hackathon_submissions_updated_at ON public.hackathon_submissions;
 CREATE TRIGGER hackathon_submissions_updated_at
 BEFORE UPDATE ON public.hackathon_submissions
 FOR EACH ROW

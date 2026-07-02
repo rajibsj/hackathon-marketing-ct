@@ -19,7 +19,7 @@ ADD COLUMN IF NOT EXISTS linkedin_post_url TEXT;
 ALTER TABLE weekly_trends
 ADD COLUMN IF NOT EXISTS idea_source TEXT DEFAULT 'curated' CHECK (idea_source IN ('curated', 'personal', 'ai_suggested'));
 
--- Create index for faster queries
+-- CREATE INDEX IF NOT EXISTS for faster queries
 CREATE INDEX IF NOT EXISTS idx_generated_posts_status ON generated_posts(status);
 CREATE INDEX IF NOT EXISTS idx_generated_posts_scheduled ON generated_posts(scheduled_for) WHERE scheduled_for IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_weekly_trends_idea_source ON weekly_trends(idea_source);

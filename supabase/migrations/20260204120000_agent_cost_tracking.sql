@@ -19,7 +19,7 @@ ADD COLUMN IF NOT EXISTS prompt_tokens INTEGER,
 ADD COLUMN IF NOT EXISTS completion_tokens INTEGER,
 ADD COLUMN IF NOT EXISTS model_used TEXT;
 
--- Create index for fast per-user time-range queries
+-- CREATE INDEX IF NOT EXISTS for fast per-user time-range queries
 CREATE INDEX IF NOT EXISTS idx_ai_agent_runs_user_time
 ON public.ai_agent_runs(executed_by, created_at DESC);
 

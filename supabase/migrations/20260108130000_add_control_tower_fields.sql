@@ -6,7 +6,7 @@ ALTER TABLE projects
 ADD COLUMN IF NOT EXISTS control_tower_project_id UUID,
 ADD COLUMN IF NOT EXISTS control_tower_last_synced_at TIMESTAMPTZ;
 
--- Create index for performance when looking up projects by Control Tower ID
+-- CREATE INDEX IF NOT EXISTS for performance when looking up projects by Control Tower ID
 CREATE INDEX IF NOT EXISTS idx_projects_control_tower_id
 ON projects(control_tower_project_id);
 

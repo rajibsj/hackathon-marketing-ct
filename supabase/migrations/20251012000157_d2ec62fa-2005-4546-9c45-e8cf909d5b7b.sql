@@ -41,6 +41,7 @@ USING (has_role(auth.uid(), 'super_admin'::app_role))
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
 
 -- Managers can only view/edit clients they're assigned to or work on
+DROP POLICY IF EXISTS "Managers can manage assigned clients" ON public.clients;
 CREATE POLICY "Managers can manage assigned clients"
 ON public.clients
 FOR ALL
@@ -55,6 +56,7 @@ WITH CHECK (
 );
 
 -- PMs can only view clients they're assigned to or work on projects for
+DROP POLICY IF EXISTS "PMs can view assigned clients" ON public.clients;
 CREATE POLICY "PMs can view assigned clients"
 ON public.clients
 FOR SELECT
@@ -65,6 +67,7 @@ USING (
 );
 
 -- PMs can update clients they work with
+DROP POLICY IF EXISTS "PMs can update assigned clients" ON public.clients;
 CREATE POLICY "PMs can update assigned clients"
 ON public.clients
 FOR UPDATE
@@ -90,6 +93,7 @@ TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role))
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
 
+DROP POLICY IF EXISTS "Users can view contacts for their clients" ON public.contacts;
 CREATE POLICY "Users can view contacts for their clients"
 ON public.contacts
 FOR SELECT
@@ -99,6 +103,7 @@ USING (
   OR user_has_client_access(auth.uid(), client_id)
 );
 
+DROP POLICY IF EXISTS "Users can manage contacts for their clients" ON public.contacts;
 CREATE POLICY "Users can manage contacts for their clients"
 ON public.contacts
 FOR ALL
@@ -129,6 +134,7 @@ TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role))
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
 
+DROP POLICY IF EXISTS "Users can manage activities for their clients" ON public.activities;
 CREATE POLICY "Users can manage activities for their clients"
 ON public.activities
 FOR ALL
@@ -159,6 +165,7 @@ TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role))
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
 
+DROP POLICY IF EXISTS "Users can manage deals for their clients" ON public.deals;
 CREATE POLICY "Users can manage deals for their clients"
 ON public.deals
 FOR ALL
@@ -189,6 +196,7 @@ TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role))
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role));
 
+DROP POLICY IF EXISTS "Users can manage communications for their clients" ON public.client_communications;
 CREATE POLICY "Users can manage communications for their clients"
 ON public.client_communications
 FOR ALL

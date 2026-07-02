@@ -46,6 +46,7 @@ import SubmitFeedbackPage from "./pages/SubmitFeedbackPage";
 import MyFeedbackPage from "./pages/MyFeedbackPage";
 import FeedbackAdminPage from "./pages/adminpanel/feedback/FeedbackAdminPage";
 import WeeklyClientEmailSummary from "./pages/WeeklyClientEmailSummary";
+import ClientRetentionCopilot from "./pages/ClientRetentionCopilot";
 import TestimonialsPage from "./pages/TestimonialsPage";
 import TestimonialSubmitPage from "./pages/TestimonialSubmitPage";
 import VisionPage from "./pages/VisionPage";
@@ -247,6 +248,11 @@ const App = () => (
               <Route path="weekly-client-email-summary" element={
                 <ProtectedRoute requiredMinimumRole="pm">
                   <WeeklyClientEmailSummary />
+                </ProtectedRoute>
+              } />
+              <Route path="client-retention-copilot" element={
+                <ProtectedRoute requiredMinimumRole="pm">
+                  <ClientRetentionCopilot />
                 </ProtectedRoute>
               } />
               <Route path="feedback/submit" element={<SubmitFeedbackPage />} />

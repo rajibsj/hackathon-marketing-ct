@@ -51,6 +51,7 @@ ALTER TABLE public.ai_configurations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_agent_runs ENABLE ROW LEVEL SECURITY;
 
 -- AI Agents policies
+DROP POLICY IF EXISTS "ai_agents_user_access" ON public.ai_agents;
 CREATE POLICY "ai_agents_user_access"
 ON public.ai_agents
 FOR ALL
@@ -60,6 +61,7 @@ USING (EXISTS (
 ));
 
 -- AI Configurations policies  
+DROP POLICY IF EXISTS "ai_configurations_user_access" ON public.ai_configurations;
 CREATE POLICY "ai_configurations_user_access"
 ON public.ai_configurations
 FOR ALL
@@ -69,6 +71,7 @@ USING (EXISTS (
 ));
 
 -- AI Agent Runs policies
+DROP POLICY IF EXISTS "ai_agent_runs_user_access" ON public.ai_agent_runs;
 CREATE POLICY "ai_agent_runs_user_access"
 ON public.ai_agent_runs
 FOR ALL

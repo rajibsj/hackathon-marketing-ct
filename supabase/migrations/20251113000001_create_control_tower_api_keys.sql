@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS control_tower_api_keys (
   CONSTRAINT unique_key_name UNIQUE (key_name)
 );
 
--- Create index for faster lookups
+-- CREATE INDEX IF NOT EXISTS for faster lookups
 CREATE INDEX IF NOT EXISTS idx_control_tower_api_keys_active
   ON control_tower_api_keys(is_active) WHERE is_active = true;
 
@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_control_tower_api_keys_active
 ALTER TABLE control_tower_api_keys ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Only managers and super_admins can view API keys
+DROP POLICY IF EXISTS "Admins can view API keys" ON control_tower_api_keys;
 CREATE POLICY "Admins can view API keys"
 ON control_tower_api_keys FOR SELECT
 TO authenticated
@@ -38,6 +39,7 @@ USING (
 );
 
 -- RLS Policy: Only super_admins can insert API keys
+DROP POLICY IF EXISTS "Super admins can insert API keys" ON control_tower_api_keys;
 CREATE POLICY "Super admins can insert API keys"
 ON control_tower_api_keys FOR INSERT
 TO authenticated
@@ -50,6 +52,7 @@ WITH CHECK (
 );
 
 -- RLS Policy: Only super_admins can update API keys
+DROP POLICY IF EXISTS "Super admins can update API keys" ON control_tower_api_keys;
 CREATE POLICY "Super admins can update API keys"
 ON control_tower_api_keys FOR UPDATE
 TO authenticated
@@ -62,6 +65,7 @@ USING (
 );
 
 -- RLS Policy: Only super_admins can delete API keys
+DROP POLICY IF EXISTS "Super admins can delete API keys" ON control_tower_api_keys;
 CREATE POLICY "Super admins can delete API keys"
 ON control_tower_api_keys FOR DELETE
 TO authenticated
@@ -82,6 +86,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_control_tower_api_keys_updated_at ON control_tower_api_keys;
 CREATE TRIGGER trigger_update_control_tower_api_keys_updated_at
   BEFORE UPDATE ON control_tower_api_keys
   FOR EACH ROW

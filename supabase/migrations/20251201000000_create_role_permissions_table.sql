@@ -23,6 +23,7 @@ ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 -- Super admins can view all role permissions
+DROP POLICY IF EXISTS "super_admins_can_view_role_permissions" ON public.role_permissions;
 CREATE POLICY "super_admins_can_view_role_permissions" ON public.role_permissions
   FOR SELECT
   TO authenticated
@@ -35,6 +36,7 @@ CREATE POLICY "super_admins_can_view_role_permissions" ON public.role_permission
   );
 
 -- Super admins can insert role permissions
+DROP POLICY IF EXISTS "super_admins_can_insert_role_permissions" ON public.role_permissions;
 CREATE POLICY "super_admins_can_insert_role_permissions" ON public.role_permissions
   FOR INSERT
   TO authenticated
@@ -47,6 +49,7 @@ CREATE POLICY "super_admins_can_insert_role_permissions" ON public.role_permissi
   );
 
 -- Super admins can update role permissions
+DROP POLICY IF EXISTS "super_admins_can_update_role_permissions" ON public.role_permissions;
 CREATE POLICY "super_admins_can_update_role_permissions" ON public.role_permissions
   FOR UPDATE
   TO authenticated
@@ -66,6 +69,7 @@ CREATE POLICY "super_admins_can_update_role_permissions" ON public.role_permissi
   );
 
 -- Super admins can delete role permissions (to reset to defaults)
+DROP POLICY IF EXISTS "super_admins_can_delete_role_permissions" ON public.role_permissions;
 CREATE POLICY "super_admins_can_delete_role_permissions" ON public.role_permissions
   FOR DELETE
   TO authenticated
@@ -77,7 +81,7 @@ CREATE POLICY "super_admins_can_delete_role_permissions" ON public.role_permissi
     )
   );
 
--- Create index on role for faster lookups
+-- CREATE INDEX IF NOT EXISTS on role for faster lookups
 CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON public.role_permissions(role);
 
 -- Create updated_at trigger
@@ -89,6 +93,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_role_permissions_updated_at ON public.role_permissions;
 CREATE TRIGGER update_role_permissions_updated_at
   BEFORE UPDATE ON public.role_permissions
   FOR EACH ROW
@@ -96,5 +101,4 @@ CREATE TRIGGER update_role_permissions_updated_at
 
 -- Grant necessary permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.role_permissions TO authenticated;
-GRANT USAGE ON SEQUENCE public.role_permissions_id_seq TO authenticated;
 

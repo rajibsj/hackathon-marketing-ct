@@ -2,12 +2,14 @@
 ALTER TABLE public.testimonial_submission_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read access for token validation (needed for submission page)
+DROP POLICY IF EXISTS "Anyone can validate tokens" ON public.testimonial_submission_tokens;
 CREATE POLICY "Anyone can validate tokens"
 ON public.testimonial_submission_tokens
 FOR SELECT
 USING (expires_at > NOW() AND used_at IS NULL);
 
 -- PMs and above can manage tokens
+DROP POLICY IF EXISTS "PMs can insert tokens" ON public.testimonial_submission_tokens;
 CREATE POLICY "PMs can insert tokens"
 ON public.testimonial_submission_tokens
 FOR INSERT
@@ -20,6 +22,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "PMs can update tokens" ON public.testimonial_submission_tokens;
 CREATE POLICY "PMs can update tokens"
 ON public.testimonial_submission_tokens
 FOR UPDATE

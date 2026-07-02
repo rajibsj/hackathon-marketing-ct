@@ -1,7 +1,7 @@
 -- Phase 1: Database Schema Extensions for Code Analysis & Generation
 
 -- Create code repositories table
-CREATE TABLE public.code_repositories (
+CREATE TABLE IF NOT EXISTS public.code_repositories (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
@@ -18,7 +18,7 @@ CREATE TABLE public.code_repositories (
 );
 
 -- Create code analysis results table
-CREATE TABLE public.code_analysis_results (
+CREATE TABLE IF NOT EXISTS public.code_analysis_results (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   repository_id UUID NOT NULL,
   analysis_type TEXT NOT NULL CHECK (analysis_type IN ('architecture', 'quality', 'security', 'performance', 'documentation')),
@@ -32,7 +32,7 @@ CREATE TABLE public.code_analysis_results (
 );
 
 -- Create code generation templates table  
-CREATE TABLE public.code_generation_templates (
+CREATE TABLE IF NOT EXISTS public.code_generation_templates (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
@@ -54,6 +54,7 @@ ALTER TABLE public.code_analysis_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.code_generation_templates ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for code_repositories
+DROP POLICY IF EXISTS "code_repositories_user_access" ON public.code_repositories;
 CREATE POLICY "code_repositories_user_access" ON public.code_repositories
 FOR ALL USING (
   EXISTS (
@@ -65,6 +66,7 @@ FOR ALL USING (
 );
 
 -- Create RLS policies for code_analysis_results
+DROP POLICY IF EXISTS "code_analysis_results_user_access" ON public.code_analysis_results;
 CREATE POLICY "code_analysis_results_user_access" ON public.code_analysis_results
 FOR ALL USING (
   EXISTS (
@@ -80,6 +82,7 @@ FOR ALL USING (
 );
 
 -- Create RLS policies for code_generation_templates
+DROP POLICY IF EXISTS "code_generation_templates_user_access" ON public.code_generation_templates;
 CREATE POLICY "code_generation_templates_user_access" ON public.code_generation_templates
 FOR ALL USING (
   EXISTS (
@@ -91,12 +94,12 @@ FOR ALL USING (
 );
 
 -- Add indexes for performance
-CREATE INDEX idx_code_repositories_created_by ON public.code_repositories(created_by);
-CREATE INDEX idx_code_repositories_status ON public.code_repositories(analysis_status);
-CREATE INDEX idx_code_analysis_results_repository_id ON public.code_analysis_results(repository_id);
-CREATE INDEX idx_code_analysis_results_type ON public.code_analysis_results(analysis_type);
-CREATE INDEX idx_code_generation_templates_category ON public.code_generation_templates(category);
-CREATE INDEX idx_code_generation_templates_framework ON public.code_generation_templates(framework);
+CREATE INDEX IF NOT EXISTS idx_code_repositories_created_by ON public.code_repositories(created_by);
+CREATE INDEX IF NOT EXISTS idx_code_repositories_status ON public.code_repositories(analysis_status);
+CREATE INDEX IF NOT EXISTS idx_code_analysis_results_repository_id ON public.code_analysis_results(repository_id);
+CREATE INDEX IF NOT EXISTS idx_code_analysis_results_type ON public.code_analysis_results(analysis_type);
+CREATE INDEX IF NOT EXISTS idx_code_generation_templates_category ON public.code_generation_templates(category);
+CREATE INDEX IF NOT EXISTS idx_code_generation_templates_framework ON public.code_generation_templates(framework);
 
 -- Insert specialized AI agents for code analysis and generation
 INSERT INTO public.ai_agents (
@@ -231,16 +234,19 @@ export function {{hookName}}({{parameters}}) {
 );
 
 -- Add triggers for updated_at timestamps
+DROP TRIGGER IF EXISTS update_code_repositories_updated_at ON public.code_repositories;
 CREATE TRIGGER update_code_repositories_updated_at
   BEFORE UPDATE ON public.code_repositories
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_code_analysis_results_updated_at ON public.code_analysis_results;
 CREATE TRIGGER update_code_analysis_results_updated_at
   BEFORE UPDATE ON public.code_analysis_results
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_code_generation_templates_updated_at ON public.code_generation_templates;
 CREATE TRIGGER update_code_generation_templates_updated_at
   BEFORE UPDATE ON public.code_generation_templates
   FOR EACH ROW

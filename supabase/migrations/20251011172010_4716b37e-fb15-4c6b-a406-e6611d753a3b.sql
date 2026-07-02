@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.integration_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Create index for faster queries
+-- CREATE INDEX IF NOT EXISTS for faster queries
 CREATE INDEX IF NOT EXISTS idx_integration_logs_type ON public.integration_logs(integration_type);
 CREATE INDEX IF NOT EXISTS idx_integration_logs_performed_by ON public.integration_logs(performed_by);
 CREATE INDEX IF NOT EXISTS idx_integration_logs_created_at ON public.integration_logs(created_at DESC);
@@ -21,6 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_integration_logs_created_at ON public.integration
 ALTER TABLE public.integration_logs ENABLE ROW LEVEL SECURITY;
 
 -- Allow super_admin and manager to view logs
+DROP POLICY IF EXISTS "Admins and managers can view integration logs" ON public.integration_logs;
 CREATE POLICY "Admins and managers can view integration logs"
 ON public.integration_logs
 FOR SELECT
@@ -31,6 +32,7 @@ USING (
 );
 
 -- Allow service role to insert logs (for edge functions)
+DROP POLICY IF EXISTS "Service role can insert logs" ON public.integration_logs;
 CREATE POLICY "Service role can insert logs"
 ON public.integration_logs
 FOR INSERT

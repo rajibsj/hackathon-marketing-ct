@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS google_drive_settings (
 ALTER TABLE google_drive_settings ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Only admins can manage Google Drive settings
+DROP POLICY IF EXISTS "Admins can manage Google Drive settings" ON google_drive_settings;
 CREATE POLICY "Admins can manage Google Drive settings"
 ON google_drive_settings
 FOR ALL

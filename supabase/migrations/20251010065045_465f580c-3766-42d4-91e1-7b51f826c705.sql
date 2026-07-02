@@ -75,8 +75,11 @@ END;
 $$;
 
 -- Step 6: Create RLS policies for user_roles
+DROP POLICY IF EXISTS "Users can view their own roles" ON public.user_roles;
 CREATE POLICY "Users can view their own roles" ON public.user_roles FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Super admins can view all roles" ON public.user_roles;
 CREATE POLICY "Super admins can view all roles" ON public.user_roles FOR SELECT USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admins can manage all roles" ON public.user_roles;
 CREATE POLICY "Super admins can manage all roles" ON public.user_roles FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
 
 -- Step 7: Drop ALL dependent policies across ALL tables
@@ -189,101 +192,149 @@ ALTER TABLE public.users DROP COLUMN IF EXISTS refresh_token_expires_at;
 -- Step 9: Recreate ALL policies using has_role function
 
 -- Recreate users policies
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.users;
 CREATE POLICY "Users can view their own profile" ON public.users FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.users;
 CREATE POLICY "Users can update their own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Super admins can view all users" ON public.users;
 CREATE POLICY "Super admins can view all users" ON public.users FOR SELECT USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can view manager level and below" ON public.users;
 CREATE POLICY "Managers can view manager level and below" ON public.users FOR SELECT USING (public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admins can insert users" ON public.users;
 CREATE POLICY "Super admins can insert users" ON public.users FOR INSERT WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admins can update any user" ON public.users;
 CREATE POLICY "Super admins can update any user" ON public.users FOR UPDATE USING (public.has_role(auth.uid(), 'super_admin'));
 
 -- Recreate brands policies
+DROP POLICY IF EXISTS "Managers can view all brands" ON public.brands;
 CREATE POLICY "Managers can view all brands" ON public.brands FOR SELECT USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
+DROP POLICY IF EXISTS "Super admins can manage all brands" ON public.brands;
 CREATE POLICY "Super admins can manage all brands" ON public.brands FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
 
 -- Recreate user_permissions policies
+DROP POLICY IF EXISTS "Super admins can view all user permissions" ON public.user_permissions;
 CREATE POLICY "Super admins can view all user permissions" ON public.user_permissions FOR SELECT USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admins can manage all user permissions" ON public.user_permissions;
 CREATE POLICY "Super admins can manage all user permissions" ON public.user_permissions FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Users can view their own permissions" ON public.user_permissions;
 CREATE POLICY "Users can view their own permissions" ON public.user_permissions FOR SELECT USING (user_id = auth.uid());
 
 -- Recreate user_brands policies
+DROP POLICY IF EXISTS "Super admins can view all user brand assignments" ON public.user_brands;
 CREATE POLICY "Super admins can view all user brand assignments" ON public.user_brands FOR SELECT USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admins can manage all user brand assignments" ON public.user_brands;
 CREATE POLICY "Super admins can manage all user brand assignments" ON public.user_brands FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Users can view their own brand assignments" ON public.user_brands;
 CREATE POLICY "Users can view their own brand assignments" ON public.user_brands FOR SELECT USING (user_id = auth.uid());
 
 -- Recreate brand_kpis policies
+DROP POLICY IF EXISTS "Managers can view all brand KPIs" ON public.brand_kpis;
 CREATE POLICY "Managers can view all brand KPIs" ON public.brand_kpis FOR SELECT USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
+DROP POLICY IF EXISTS "Super admins can manage all brand KPIs" ON public.brand_kpis;
 CREATE POLICY "Super admins can manage all brand KPIs" ON public.brand_kpis FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
 
 -- Recreate clients policies
+DROP POLICY IF EXISTS "Managers can view and edit clients" ON public.clients;
 CREATE POLICY "Managers can view and edit clients" ON public.clients FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
+DROP POLICY IF EXISTS "Super admins can manage all clients" ON public.clients;
 CREATE POLICY "Super admins can manage all clients" ON public.clients FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "PMs can view assigned clients" ON public.clients;
 CREATE POLICY "PMs can view assigned clients" ON public.clients FOR SELECT USING (assigned_manager = auth.uid() OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate projects policies
+DROP POLICY IF EXISTS "Super admins can manage all projects" ON public.projects;
 CREATE POLICY "Super admins can manage all projects" ON public.projects FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers and PMs can view and edit projects" ON public.projects;
 CREATE POLICY "Managers and PMs can view and edit projects" ON public.projects FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
+DROP POLICY IF EXISTS "Team members can view assigned projects" ON public.projects;
 CREATE POLICY "Team members can view assigned projects" ON public.projects FOR SELECT USING (project_manager = auth.uid() OR auth.uid() = ANY(assigned_team) OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate project_tasks policies
+DROP POLICY IF EXISTS "Super admins can manage all project tasks" ON public.project_tasks;
 CREATE POLICY "Super admins can manage all project tasks" ON public.project_tasks FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Team members can view and edit their assigned tasks" ON public.project_tasks;
 CREATE POLICY "Team members can view and edit their assigned tasks" ON public.project_tasks FOR ALL USING (assigned_to = auth.uid() OR EXISTS (SELECT 1 FROM projects p WHERE p.id = project_tasks.project_id AND (p.project_manager = auth.uid() OR auth.uid() = ANY(p.assigned_team))) OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate client_communications policies
+DROP POLICY IF EXISTS "Super admins can manage all communications" ON public.client_communications;
 CREATE POLICY "Super admins can manage all communications" ON public.client_communications FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Team members can view and create communications" ON public.client_communications;
 CREATE POLICY "Team members can view and create communications" ON public.client_communications FOR ALL USING (created_by = auth.uid() OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate collabai_integrations policies
+DROP POLICY IF EXISTS "collabai_integrations_user_access" ON public.collabai_integrations;
 CREATE POLICY "collabai_integrations_user_access" ON public.collabai_integrations FOR ALL USING (user_id = auth.uid() OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Recreate gohighlevel_integrations policies
+DROP POLICY IF EXISTS "ghl_integrations_user_access" ON public.gohighlevel_integrations;
 CREATE POLICY "ghl_integrations_user_access" ON public.gohighlevel_integrations FOR ALL USING (user_id = auth.uid() OR public.has_role(auth.uid(), 'super_admin'));
 
 -- Recreate gohighlevel_contacts policies
+DROP POLICY IF EXISTS "ghl_contacts_user_access" ON public.gohighlevel_contacts;
 CREATE POLICY "ghl_contacts_user_access" ON public.gohighlevel_contacts FOR ALL USING (EXISTS (SELECT 1 FROM gohighlevel_integrations gi WHERE gi.id = gohighlevel_contacts.integration_id AND (gi.user_id = auth.uid() OR public.has_role(auth.uid(), 'super_admin'))));
 
 -- Recreate ai_agents policies
+DROP POLICY IF EXISTS "ai_agents_user_access" ON public.ai_agents;
 CREATE POLICY "ai_agents_user_access" ON public.ai_agents FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Recreate ai_configurations policies
+DROP POLICY IF EXISTS "ai_configurations_user_access" ON public.ai_configurations;
 CREATE POLICY "ai_configurations_user_access" ON public.ai_configurations FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Recreate ai_agent_runs policies
+DROP POLICY IF EXISTS "ai_agent_runs_user_access" ON public.ai_agent_runs;
 CREATE POLICY "ai_agent_runs_user_access" ON public.ai_agent_runs FOR ALL USING (executed_by = auth.uid() OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Recreate code_repositories policies
+DROP POLICY IF EXISTS "code_repositories_user_access" ON public.code_repositories;
 CREATE POLICY "code_repositories_user_access" ON public.code_repositories FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm') OR created_by = auth.uid());
 
 -- Recreate code_analysis_results policies
+DROP POLICY IF EXISTS "code_analysis_results_user_access" ON public.code_analysis_results;
 CREATE POLICY "code_analysis_results_user_access" ON public.code_analysis_results FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm') OR EXISTS (SELECT 1 FROM code_repositories cr WHERE cr.id = code_analysis_results.repository_id AND cr.created_by = auth.uid()));
 
 -- Recreate code_generation_templates policies
+DROP POLICY IF EXISTS "code_generation_templates_user_access" ON public.code_generation_templates;
 CREATE POLICY "code_generation_templates_user_access" ON public.code_generation_templates FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm') OR created_by = auth.uid());
 
 -- Recreate team_eod_submissions policies
+DROP POLICY IF EXISTS "Managers can view all EOD submissions" ON public.team_eod_submissions;
 CREATE POLICY "Managers can view all EOD submissions" ON public.team_eod_submissions FOR SELECT USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate activecollab_task_data policies
+DROP POLICY IF EXISTS "Managers can view all task data" ON public.activecollab_task_data;
 CREATE POLICY "Managers can view all task data" ON public.activecollab_task_data FOR SELECT USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate team_daily_summaries policies
+DROP POLICY IF EXISTS "Managers can view all summaries" ON public.team_daily_summaries;
 CREATE POLICY "Managers can view all summaries" ON public.team_daily_summaries FOR SELECT USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager') OR public.has_role(auth.uid(), 'pm'));
 
 -- Recreate contacts policies
+DROP POLICY IF EXISTS "Super admins can manage all contacts" ON public.contacts;
 CREATE POLICY "Super admins can manage all contacts" ON public.contacts FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can view and edit contacts" ON public.contacts;
 CREATE POLICY "Managers can view and edit contacts" ON public.contacts FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Recreate deals policies
+DROP POLICY IF EXISTS "Super admins can manage all deals" ON public.deals;
 CREATE POLICY "Super admins can manage all deals" ON public.deals FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can view and edit deals" ON public.deals;
 CREATE POLICY "Managers can view and edit deals" ON public.deals FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Recreate activities policies
+DROP POLICY IF EXISTS "Super admins can manage all activities" ON public.activities;
 CREATE POLICY "Super admins can manage all activities" ON public.activities FOR ALL USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Managers can view and edit activities" ON public.activities;
 CREATE POLICY "Managers can view and edit activities" ON public.activities FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Recreate user_accountability_chart policies
+DROP POLICY IF EXISTS "Users can view their own accountability chart" ON public.user_accountability_chart;
 CREATE POLICY "Users can view their own accountability chart" ON public.user_accountability_chart FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users can manage their own accountability chart" ON public.user_accountability_chart;
 CREATE POLICY "Users can manage their own accountability chart" ON public.user_accountability_chart FOR ALL USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Managers can view all accountability charts" ON public.user_accountability_chart;
 CREATE POLICY "Managers can view all accountability charts" ON public.user_accountability_chart FOR SELECT USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
+DROP POLICY IF EXISTS "Managers can manage all accountability charts" ON public.user_accountability_chart;
 CREATE POLICY "Managers can manage all accountability charts" ON public.user_accountability_chart FOR ALL USING (public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager'));
 
 -- Step 10: Reload schema cache

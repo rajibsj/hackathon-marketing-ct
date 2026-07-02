@@ -1,5 +1,29 @@
 -- Complete vector tables setup (missing from partial migrations)
 
+-- Drop legacy schemas from 20251209000002 so we can recreate the current shape
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_embeddings' AND column_name = 'brand_file_id'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_embeddings' AND column_name = 'file_id'
+  ) THEN
+    DROP TABLE public.brand_knowledge_embeddings CASCADE;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'agent_memories' AND column_name = 'agent_user_id'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'agent_memories' AND column_name = 'user_id'
+  ) THEN
+    DROP TABLE public.agent_memories CASCADE;
+  END IF;
+END $$;
+
 -- Create brand_knowledge_embeddings table if not exists
 CREATE TABLE IF NOT EXISTS public.brand_knowledge_embeddings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -50,16 +74,40 @@ BEGIN
 END $$;
 
 -- Create indexes for vector search
-CREATE INDEX IF NOT EXISTS idx_brand_knowledge_embeddings_file_id ON public.brand_knowledge_embeddings(file_id);
-CREATE INDEX IF NOT EXISTS idx_brand_knowledge_embeddings_brand_id ON public.brand_knowledge_embeddings(brand_id);
-CREATE INDEX IF NOT EXISTS idx_agent_memories_agent_id ON public.agent_memories(agent_id);
-CREATE INDEX IF NOT EXISTS idx_agent_memories_user_id ON public.agent_memories(user_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_embeddings' AND column_name = 'file_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_brand_knowledge_embeddings_file_id ON public.brand_knowledge_embeddings(file_id);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_embeddings' AND column_name = 'brand_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_brand_knowledge_embeddings_brand_id ON public.brand_knowledge_embeddings(brand_id);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'agent_memories' AND column_name = 'agent_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_agent_memories_agent_id ON public.agent_memories(agent_id);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'agent_memories' AND column_name = 'user_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_agent_memories_user_id ON public.agent_memories(user_id);
+  END IF;
+END $$;
 
 -- Enable RLS on new tables
 ALTER TABLE public.brand_knowledge_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.agent_memories ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for brand_knowledge_embeddings
+DROP POLICY IF EXISTS "Team members can view brand embeddings" ON public.brand_knowledge_embeddings;
 CREATE POLICY "Team members can view brand embeddings" ON public.brand_knowledge_embeddings
   FOR SELECT USING (
     user_has_brand_access(auth.uid(), brand_id) 
@@ -67,6 +115,7 @@ CREATE POLICY "Team members can view brand embeddings" ON public.brand_knowledge
     OR has_role(auth.uid(), 'manager'::app_role)
   );
 
+DROP POLICY IF EXISTS "Team members can manage brand embeddings" ON public.brand_knowledge_embeddings;
 CREATE POLICY "Team members can manage brand embeddings" ON public.brand_knowledge_embeddings
   FOR ALL USING (
     user_has_brand_access(auth.uid(), brand_id) 
@@ -75,6 +124,7 @@ CREATE POLICY "Team members can manage brand embeddings" ON public.brand_knowled
   );
 
 -- RLS policies for agent_memories
+DROP POLICY IF EXISTS "Users can view their own memories" ON public.agent_memories;
 CREATE POLICY "Users can view their own memories" ON public.agent_memories
   FOR SELECT USING (
     user_id = auth.uid() 
@@ -82,6 +132,7 @@ CREATE POLICY "Users can view their own memories" ON public.agent_memories
     OR has_role(auth.uid(), 'manager'::app_role)
   );
 
+DROP POLICY IF EXISTS "Users can manage their own memories" ON public.agent_memories;
 CREATE POLICY "Users can manage their own memories" ON public.agent_memories
   FOR ALL USING (
     user_id = auth.uid() 

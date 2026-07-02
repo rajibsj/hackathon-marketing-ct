@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS project_meetings (
   UNIQUE(project_id, meeting_id)
 );
 
--- Create index for faster queries
+-- CREATE INDEX IF NOT EXISTS for faster queries
 CREATE INDEX IF NOT EXISTS idx_project_meetings_project_id ON project_meetings(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_meetings_meeting_id ON project_meetings(meeting_id);
 CREATE INDEX IF NOT EXISTS idx_project_meetings_start_time ON project_meetings(start_time DESC);
@@ -28,6 +28,7 @@ ALTER TABLE project_meetings ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
 -- Allow users with pm role or higher to view project meetings
+DROP POLICY IF EXISTS "Users with pm role can view project meetings" ON project_meetings;
 CREATE POLICY "Users with pm role can view project meetings"
   ON project_meetings
   FOR SELECT
@@ -41,6 +42,7 @@ CREATE POLICY "Users with pm role can view project meetings"
   );
 
 -- Allow users with pm role or higher to insert project meetings
+DROP POLICY IF EXISTS "Users with pm role can insert project meetings" ON project_meetings;
 CREATE POLICY "Users with pm role can insert project meetings"
   ON project_meetings
   FOR INSERT
@@ -54,6 +56,7 @@ CREATE POLICY "Users with pm role can insert project meetings"
   );
 
 -- Allow users with pm role or higher to update project meetings
+DROP POLICY IF EXISTS "Users with pm role can update project meetings" ON project_meetings;
 CREATE POLICY "Users with pm role can update project meetings"
   ON project_meetings
   FOR UPDATE
@@ -67,6 +70,7 @@ CREATE POLICY "Users with pm role can update project meetings"
   );
 
 -- Allow users with pm role or higher to delete project meetings
+DROP POLICY IF EXISTS "Users with pm role can delete project meetings" ON project_meetings;
 CREATE POLICY "Users with pm role can delete project meetings"
   ON project_meetings
   FOR DELETE
@@ -88,6 +92,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_project_meetings_updated_at_trigger ON project_meetings;
 CREATE TRIGGER update_project_meetings_updated_at_trigger
   BEFORE UPDATE ON project_meetings
   FOR EACH ROW

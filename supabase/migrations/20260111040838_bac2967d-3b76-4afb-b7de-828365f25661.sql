@@ -7,9 +7,10 @@ ALTER TABLE public.project_tasks
 ALTER COLUMN project_id DROP NOT NULL;
 
 -- Add index for client_id for better query performance
-CREATE INDEX idx_project_tasks_client_id ON public.project_tasks(client_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_client_id ON public.project_tasks(client_id);
 
 -- Add RLS policy for client-based access (users can see tasks for clients they have access to)
+DROP POLICY IF EXISTS "Users can view tasks for accessible clients" ON public.project_tasks;
 CREATE POLICY "Users can view tasks for accessible clients"
 ON public.project_tasks
 FOR SELECT

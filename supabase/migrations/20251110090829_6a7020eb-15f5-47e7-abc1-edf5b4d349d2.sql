@@ -4,6 +4,7 @@ DROP POLICY IF EXISTS "Team members can view knowledge files" ON storage.objects
 DROP POLICY IF EXISTS "Team members can delete knowledge files" ON storage.objects;
 
 -- RLS policies for knowledge bucket
+DROP POLICY IF EXISTS "Team members can upload to knowledge bucket" ON storage;
 CREATE POLICY "Team members can upload to knowledge bucket"
 ON storage.objects FOR INSERT
 WITH CHECK (
@@ -20,6 +21,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Team members can view knowledge files" ON storage;
 CREATE POLICY "Team members can view knowledge files"
 ON storage.objects FOR SELECT
 USING (
@@ -36,6 +38,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Team members can delete knowledge files" ON storage;
 CREATE POLICY "Team members can delete knowledge files"
 ON storage.objects FOR DELETE
 USING (

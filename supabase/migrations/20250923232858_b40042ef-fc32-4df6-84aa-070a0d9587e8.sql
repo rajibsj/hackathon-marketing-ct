@@ -1,5 +1,5 @@
 -- Create brands table
-CREATE TABLE public.brands (
+CREATE TABLE IF NOT EXISTS public.brands (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -12,7 +12,7 @@ CREATE TABLE public.brands (
 );
 
 -- Create user_permissions table
-CREATE TABLE public.user_permissions (
+CREATE TABLE IF NOT EXISTS public.user_permissions (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   module_name TEXT NOT NULL,
@@ -26,7 +26,7 @@ CREATE TABLE public.user_permissions (
 );
 
 -- Create user_brands junction table (many-to-many relationship)
-CREATE TABLE public.user_brands (
+CREATE TABLE IF NOT EXISTS public.user_brands (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   brand_id UUID NOT NULL REFERENCES public.brands(id) ON DELETE CASCADE,
@@ -49,6 +49,7 @@ ALTER TABLE public.user_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_brands ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for brands table
+DROP POLICY IF EXISTS "Super admins can view all brands" ON public.brands;
 CREATE POLICY "Super admins can view all brands" 
 ON public.brands FOR SELECT 
 USING (EXISTS (
@@ -57,6 +58,7 @@ USING (EXISTS (
   AND users.role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Managers can view all brands" ON public.brands;
 CREATE POLICY "Managers can view all brands" 
 ON public.brands FOR SELECT 
 USING (EXISTS (
@@ -65,6 +67,7 @@ USING (EXISTS (
   AND users.role = ANY(ARRAY['super_admin'::app_role, 'manager'::app_role])
 ));
 
+DROP POLICY IF EXISTS "Super admins can manage all brands" ON public.brands;
 CREATE POLICY "Super admins can manage all brands" 
 ON public.brands FOR ALL 
 USING (EXISTS (
@@ -74,6 +77,7 @@ USING (EXISTS (
 ));
 
 -- RLS Policies for user_permissions table
+DROP POLICY IF EXISTS "Super admins can view all user permissions" ON public.user_permissions;
 CREATE POLICY "Super admins can view all user permissions" 
 ON public.user_permissions FOR SELECT 
 USING (EXISTS (
@@ -82,6 +86,7 @@ USING (EXISTS (
   AND users.role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Super admins can manage all user permissions" ON public.user_permissions;
 CREATE POLICY "Super admins can manage all user permissions" 
 ON public.user_permissions FOR ALL 
 USING (EXISTS (
@@ -90,11 +95,13 @@ USING (EXISTS (
   AND users.role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Users can view their own permissions" ON public.user_permissions;
 CREATE POLICY "Users can view their own permissions" 
 ON public.user_permissions FOR SELECT 
 USING (user_id::text = auth.uid()::text);
 
 -- RLS Policies for user_brands table
+DROP POLICY IF EXISTS "Super admins can view all user brand assignments" ON public.user_brands;
 CREATE POLICY "Super admins can view all user brand assignments" 
 ON public.user_brands FOR SELECT 
 USING (EXISTS (
@@ -103,6 +110,7 @@ USING (EXISTS (
   AND users.role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Super admins can manage all user brand assignments" ON public.user_brands;
 CREATE POLICY "Super admins can manage all user brand assignments" 
 ON public.user_brands FOR ALL 
 USING (EXISTS (
@@ -111,33 +119,37 @@ USING (EXISTS (
   AND users.role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Users can view their own brand assignments" ON public.user_brands;
 CREATE POLICY "Users can view their own brand assignments" 
 ON public.user_brands FOR SELECT 
 USING (user_id::text = auth.uid()::text);
 
 -- Create triggers for updated_at columns
+DROP TRIGGER IF EXISTS update_brands_updated_at ON public.brands;
 CREATE TRIGGER update_brands_updated_at
 BEFORE UPDATE ON public.brands
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_user_permissions_updated_at ON public.user_permissions;
 CREATE TRIGGER update_user_permissions_updated_at
 BEFORE UPDATE ON public.user_permissions
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_user_brands_updated_at ON public.user_brands;
 CREATE TRIGGER update_user_brands_updated_at
 BEFORE UPDATE ON public.user_brands
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Create indexes for better performance
-CREATE INDEX idx_user_permissions_user_id ON public.user_permissions(user_id);
-CREATE INDEX idx_user_permissions_module ON public.user_permissions(module_name);
-CREATE INDEX idx_user_brands_user_id ON public.user_brands(user_id);
-CREATE INDEX idx_user_brands_brand_id ON public.user_brands(brand_id);
-CREATE INDEX idx_brands_status ON public.brands(status);
-CREATE INDEX idx_users_status ON public.users(status);
+CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON public.user_permissions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_permissions_module ON public.user_permissions(module_name);
+CREATE INDEX IF NOT EXISTS idx_user_brands_user_id ON public.user_brands(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_brands_brand_id ON public.user_brands(brand_id);
+CREATE INDEX IF NOT EXISTS idx_brands_status ON public.brands(status);
+CREATE INDEX IF NOT EXISTS idx_users_status ON public.users(status);
 
 -- Insert some initial brand data
 INSERT INTO public.brands (name, slug, description, status) VALUES 

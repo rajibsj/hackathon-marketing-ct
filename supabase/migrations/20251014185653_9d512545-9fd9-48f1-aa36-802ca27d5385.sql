@@ -15,18 +15,21 @@ CREATE TABLE IF NOT EXISTS public.ai_generated_images (
 ALTER TABLE public.ai_generated_images ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own images
+DROP POLICY IF EXISTS "Users can view their own generated images" ON public.ai_generated_images;
 CREATE POLICY "Users can view their own generated images"
   ON public.ai_generated_images
   FOR SELECT 
   USING (auth.uid() = user_id);
 
 -- Users can insert their own image logs
+DROP POLICY IF EXISTS "Users can insert their own image logs" ON public.ai_generated_images;
 CREATE POLICY "Users can insert their own image logs"
   ON public.ai_generated_images
   FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 
 -- Admins can view all images
+DROP POLICY IF EXISTS "Admins can view all generated images" ON public.ai_generated_images;
 CREATE POLICY "Admins can view all generated images"
   ON public.ai_generated_images
   FOR ALL 

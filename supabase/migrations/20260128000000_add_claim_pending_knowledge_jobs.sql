@@ -5,6 +5,16 @@
 -- to prevent race conditions when multiple workers process jobs simultaneously.
 -- ============================================================================
 
+-- Early knowledge_files schema used inserted_at instead of created_at
+ALTER TABLE public.knowledge_files ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ;
+UPDATE public.knowledge_files
+SET created_at = inserted_at
+WHERE created_at IS NULL
+  AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'knowledge_files' AND column_name = 'inserted_at'
+  );
+
 -- ─────────────────────────────────────────────────────────────────
 -- IMPROVEMENT 1: Atomic Job Locking with FOR UPDATE SKIP LOCKED
 -- Prevents race conditions when multiple workers grab jobs

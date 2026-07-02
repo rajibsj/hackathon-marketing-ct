@@ -9,10 +9,10 @@ ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'general';
 ALTER TABLE project_tasks
 ADD COLUMN IF NOT EXISTS brand_id UUID REFERENCES brands(id) ON DELETE SET NULL;
 
--- Create index for brand_id for faster queries
+-- CREATE INDEX IF NOT EXISTS for brand_id for faster queries
 CREATE INDEX IF NOT EXISTS idx_project_tasks_brand_id ON project_tasks(brand_id);
 
--- Create index for category for faster filtering
+-- CREATE INDEX IF NOT EXISTS for category for faster filtering
 CREATE INDEX IF NOT EXISTS idx_project_tasks_category ON project_tasks(category);
 
 -- Add comment for documentation
@@ -21,7 +21,8 @@ COMMENT ON COLUMN project_tasks.brand_id IS 'Optional brand association for bran
 
 -- Update RLS policies to allow brand-based access
 -- Users can view tasks for brands they have access to
-CREATE POLICY IF NOT EXISTS "Users can view brand tasks" ON project_tasks
+DROP POLICY IF EXISTS "Users can view brand tasks" ON project_tasks;
+CREATE POLICY "Users can view brand tasks" ON project_tasks
     FOR SELECT
     USING (
         brand_id IS NULL

@@ -24,18 +24,21 @@ DROP POLICY IF EXISTS "estimates_delete" ON estimates;
 -- Create new policies for all authenticated users
 
 -- INSERT: All authenticated users can create estimates
+DROP POLICY IF EXISTS "estimates_authenticated_insert" ON estimates;
 CREATE POLICY "estimates_authenticated_insert" ON estimates
   FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
 -- SELECT: Users can read their own estimates
+DROP POLICY IF EXISTS "estimates_authenticated_select_own" ON estimates;
 CREATE POLICY "estimates_authenticated_select_own" ON estimates
   FOR SELECT
   TO authenticated
   USING (created_by = auth.uid());
 
 -- SELECT: Super admin can read all estimates
+DROP POLICY IF EXISTS "estimates_super_admin_select_all" ON estimates;
 CREATE POLICY "estimates_super_admin_select_all" ON estimates
   FOR SELECT
   TO authenticated
@@ -48,6 +51,7 @@ CREATE POLICY "estimates_super_admin_select_all" ON estimates
   );
 
 -- UPDATE: Users can update their own estimates
+DROP POLICY IF EXISTS "estimates_authenticated_update_own" ON estimates;
 CREATE POLICY "estimates_authenticated_update_own" ON estimates
   FOR UPDATE
   TO authenticated
@@ -55,6 +59,7 @@ CREATE POLICY "estimates_authenticated_update_own" ON estimates
   WITH CHECK (created_by = auth.uid());
 
 -- DELETE: Users can delete their own draft estimates, super admin can delete any
+DROP POLICY IF EXISTS "estimates_authenticated_delete" ON estimates;
 CREATE POLICY "estimates_authenticated_delete" ON estimates
   FOR DELETE
   TO authenticated
@@ -76,6 +81,7 @@ CREATE POLICY "estimates_authenticated_delete" ON estimates
 DROP POLICY IF EXISTS "service_categories_pm_read" ON service_categories;
 
 -- Create new policy for all authenticated users
+DROP POLICY IF EXISTS "service_categories_authenticated_read" ON service_categories;
 CREATE POLICY "service_categories_authenticated_read" ON service_categories
   FOR SELECT
   TO authenticated
@@ -90,6 +96,7 @@ CREATE POLICY "service_categories_authenticated_read" ON service_categories
 DROP POLICY IF EXISTS "services_pm_read" ON services;
 
 -- Create new policy for all authenticated users
+DROP POLICY IF EXISTS "services_authenticated_read" ON services;
 CREATE POLICY "services_authenticated_read" ON services
   FOR SELECT
   TO authenticated

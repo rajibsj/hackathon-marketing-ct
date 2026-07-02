@@ -12,6 +12,7 @@ create table if not exists public.organization_integrations (
 alter table public.organization_integrations enable row level security;
 
 drop policy if exists "organization_integrations_super_admin" on public.organization_integrations;
+DROP POLICY IF EXISTS "organization_integrations_super_admin" ON public.organization_integrations;
 create policy "organization_integrations_super_admin"
   on public.organization_integrations
   for all

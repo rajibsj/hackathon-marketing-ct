@@ -17,6 +17,7 @@ VALUES (
 );
 
 -- RLS policies for leader-documents bucket
+DROP POLICY IF EXISTS "Managers can upload leader documents" ON storage;
 CREATE POLICY "Managers can upload leader documents"
 ON storage.objects
 FOR INSERT
@@ -30,6 +31,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Managers can update leader documents" ON storage;
 CREATE POLICY "Managers can update leader documents"
 ON storage.objects
 FOR UPDATE
@@ -43,6 +45,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Managers can delete leader documents" ON storage;
 CREATE POLICY "Managers can delete leader documents"
 ON storage.objects
 FOR DELETE
@@ -56,6 +59,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Anyone can view leader documents" ON storage;
 CREATE POLICY "Anyone can view leader documents"
 ON storage.objects
 FOR SELECT
@@ -68,6 +72,6 @@ ADD COLUMN file_type text NOT NULL DEFAULT 'url' CHECK (file_type IN ('url', 'up
 ADD COLUMN file_size bigint,
 ADD COLUMN mime_type text;
 
--- Create index for better query performance
-CREATE INDEX idx_leader_uploads_type ON leader_uploads(file_type);
-CREATE INDEX idx_leader_uploads_leader_type ON leader_uploads(leader_id, file_type);
+-- CREATE INDEX IF NOT EXISTS for better query performance
+CREATE INDEX IF NOT EXISTS idx_leader_uploads_type ON leader_uploads(file_type);
+CREATE INDEX IF NOT EXISTS idx_leader_uploads_leader_type ON leader_uploads(leader_id, file_type);

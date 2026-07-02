@@ -16,7 +16,7 @@ import logo from "@/assets/logo-sji-login.png";
 // Demo credentials (for development/demo purposes)
 const DEMO_CREDENTIALS = {
   admin: {
-    email: "demo.admin@sjinnovation.com",
+    email: "demo1.admin@sjinnovation.com",
     password: "demo-password-123",
     label: "Admin Demo",
   },
@@ -229,9 +229,19 @@ export default function Login() {
 
                   {/* Demo Credentials Section */}
                   <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 my-4">
-                    <p className="text-sm font-medium text-amber-900 mb-3">
+                    <p className="text-sm font-medium text-amber-900 mb-2">
                       Demo Credentials
                     </p>
+                    <div className="rounded-md bg-white/80 border border-amber-100 px-3 py-2 mb-3 text-xs text-amber-950 space-y-1">
+                      <p>
+                        <span className="font-semibold">Admin:</span>{" "}
+                        <code className="text-amber-900">{DEMO_CREDENTIALS.admin.email}</code>
+                      </p>
+                      <p>
+                        <span className="font-semibold">Password:</span>{" "}
+                        <code className="text-amber-900">{DEMO_CREDENTIALS.admin.password}</code>
+                      </p>
+                    </div>
                     <div className="space-y-2">
                       <Button
                         type="button"

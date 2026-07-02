@@ -8,7 +8,7 @@ ALTER TABLE brand_analytics_integrations
   ADD COLUMN IF NOT EXISTS service_account_key_encrypted TEXT,
   ADD COLUMN IF NOT EXISTS metrics_config JSONB DEFAULT '{"sessions": true, "users": true, "pageviews": true, "conversions": true}'::jsonb;
 
--- Create index for faster lookups
+-- CREATE INDEX IF NOT EXISTS for faster lookups
 CREATE INDEX IF NOT EXISTS idx_brand_analytics_ga4_property 
   ON brand_analytics_integrations(ga4_property_id) 
   WHERE ga4_property_id IS NOT NULL;

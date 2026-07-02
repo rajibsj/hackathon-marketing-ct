@@ -1,5 +1,5 @@
 -- Create sora_videos table for local metadata storage
-CREATE TABLE public.sora_videos (
+CREATE TABLE IF NOT EXISTS public.sora_videos (
   id text PRIMARY KEY,
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   
@@ -34,23 +34,27 @@ CREATE TABLE public.sora_videos (
 ALTER TABLE public.sora_videos ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies
+DROP POLICY IF EXISTS "Users can view their own sora videos" ON public.sora_videos;
 CREATE POLICY "Users can view their own sora videos"
   ON public.sora_videos FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own sora videos" ON public.sora_videos;
 CREATE POLICY "Users can insert their own sora videos"
   ON public.sora_videos FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own sora videos" ON public.sora_videos;
 CREATE POLICY "Users can update their own sora videos"
   ON public.sora_videos FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own sora videos" ON public.sora_videos;
 CREATE POLICY "Users can delete their own sora videos"
   ON public.sora_videos FOR DELETE
   USING (auth.uid() = user_id);
 
 -- Indexes for performance
-CREATE INDEX idx_sora_videos_user_id ON public.sora_videos(user_id);
-CREATE INDEX idx_sora_videos_brand_id ON public.sora_videos(brand_id);
-CREATE INDEX idx_sora_videos_status ON public.sora_videos(status);
+CREATE INDEX IF NOT EXISTS idx_sora_videos_user_id ON public.sora_videos(user_id);
+CREATE INDEX IF NOT EXISTS idx_sora_videos_brand_id ON public.sora_videos(brand_id);
+CREATE INDEX IF NOT EXISTS idx_sora_videos_status ON public.sora_videos(status);

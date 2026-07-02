@@ -92,15 +92,15 @@ CREATE TABLE IF NOT EXISTS public.keyword_blog_usage (
 );
 
 -- Indexes
-CREATE INDEX idx_keyword_research_brand_id ON public.keyword_research(brand_id);
-CREATE INDEX idx_keyword_research_status ON public.keyword_research(status);
-CREATE INDEX idx_keyword_research_priority ON public.keyword_research(priority);
-CREATE INDEX idx_keyword_suggestions_brand_id ON public.keyword_suggestions(brand_id);
-CREATE INDEX idx_keyword_suggestions_expires ON public.keyword_suggestions(expires_at);
-CREATE INDEX idx_keyword_ranking_history_keyword_id ON public.keyword_ranking_history(keyword_id);
-CREATE INDEX idx_keyword_ranking_history_checked_at ON public.keyword_ranking_history(checked_at DESC);
-CREATE INDEX idx_keyword_blog_usage_keyword_id ON public.keyword_blog_usage(keyword_id);
-CREATE INDEX idx_keyword_blog_usage_blog_id ON public.keyword_blog_usage(blog_id);
+CREATE INDEX IF NOT EXISTS idx_keyword_research_brand_id ON public.keyword_research(brand_id);
+CREATE INDEX IF NOT EXISTS idx_keyword_research_status ON public.keyword_research(status);
+CREATE INDEX IF NOT EXISTS idx_keyword_research_priority ON public.keyword_research(priority);
+CREATE INDEX IF NOT EXISTS idx_keyword_suggestions_brand_id ON public.keyword_suggestions(brand_id);
+CREATE INDEX IF NOT EXISTS idx_keyword_suggestions_expires ON public.keyword_suggestions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_keyword_ranking_history_keyword_id ON public.keyword_ranking_history(keyword_id);
+CREATE INDEX IF NOT EXISTS idx_keyword_ranking_history_checked_at ON public.keyword_ranking_history(checked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_keyword_blog_usage_keyword_id ON public.keyword_blog_usage(keyword_id);
+CREATE INDEX IF NOT EXISTS idx_keyword_blog_usage_blog_id ON public.keyword_blog_usage(blog_id);
 
 -- RLS Policies
 ALTER TABLE public.keyword_research ENABLE ROW LEVEL SECURITY;
@@ -109,6 +109,7 @@ ALTER TABLE public.keyword_ranking_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.keyword_blog_usage ENABLE ROW LEVEL SECURITY;
 
 -- Users can manage keywords for their brands
+DROP POLICY IF EXISTS "Users can manage brand keywords" ON public.keyword_research;
 CREATE POLICY "Users can manage brand keywords"
   ON public.keyword_research FOR ALL
   USING (
@@ -118,6 +119,7 @@ CREATE POLICY "Users can manage brand keywords"
   );
 
 -- Users can view suggestions for their brands
+DROP POLICY IF EXISTS "Users can view brand suggestions" ON public.keyword_suggestions;
 CREATE POLICY "Users can view brand suggestions"
   ON public.keyword_suggestions FOR SELECT
   USING (
@@ -127,11 +129,13 @@ CREATE POLICY "Users can view brand suggestions"
   );
 
 -- Users can create suggestions
+DROP POLICY IF EXISTS "Users can create suggestions" ON public.keyword_suggestions;
 CREATE POLICY "Users can create suggestions"
   ON public.keyword_suggestions FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- Users can view ranking history for their keywords
+DROP POLICY IF EXISTS "Users can view ranking history" ON public.keyword_ranking_history;
 CREATE POLICY "Users can view ranking history"
   ON public.keyword_ranking_history FOR SELECT
   USING (
@@ -145,11 +149,13 @@ CREATE POLICY "Users can view ranking history"
   );
 
 -- Service role can insert ranking history
+DROP POLICY IF EXISTS "Service role can insert ranking history" ON public.keyword_ranking_history;
 CREATE POLICY "Service role can insert ranking history"
   ON public.keyword_ranking_history FOR INSERT
   WITH CHECK ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
 
 -- Users can view blog usage for their keywords
+DROP POLICY IF EXISTS "Users can view blog usage" ON public.keyword_blog_usage;
 CREATE POLICY "Users can view blog usage"
   ON public.keyword_blog_usage FOR SELECT
   USING (
@@ -163,11 +169,13 @@ CREATE POLICY "Users can view blog usage"
   );
 
 -- Service role can manage blog usage
+DROP POLICY IF EXISTS "Service role can manage blog usage" ON public.keyword_blog_usage;
 CREATE POLICY "Service role can manage blog usage"
   ON public.keyword_blog_usage FOR ALL
   USING ((auth.jwt() ->> 'role'::text) = 'service_role'::text);
 
 -- Updated_at trigger
+DROP TRIGGER IF EXISTS update_keyword_research_updated_at ON public.keyword_research;
 CREATE TRIGGER update_keyword_research_updated_at
   BEFORE UPDATE ON public.keyword_research
   FOR EACH ROW

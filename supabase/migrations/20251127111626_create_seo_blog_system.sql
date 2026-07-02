@@ -125,26 +125,31 @@ ALTER TABLE public.seo_blog_generation_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.seo_reference_summaries ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own blogs
+DROP POLICY IF EXISTS "Users can view own blogs" ON public.seo_blog_content;
 CREATE POLICY "Users can view own blogs"
   ON public.seo_blog_content FOR SELECT
   USING (auth.uid() = user_id);
 
 -- Users can insert blogs
+DROP POLICY IF EXISTS "Users can create blogs" ON public.seo_blog_content;
 CREATE POLICY "Users can create blogs"
   ON public.seo_blog_content FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- Users can update their own blogs
+DROP POLICY IF EXISTS "Users can update own blogs" ON public.seo_blog_content;
 CREATE POLICY "Users can update own blogs"
   ON public.seo_blog_content FOR UPDATE
   USING (auth.uid() = user_id);
 
 -- Users can delete their own blogs
+DROP POLICY IF EXISTS "Users can delete own blogs" ON public.seo_blog_content;
 CREATE POLICY "Users can delete own blogs"
   ON public.seo_blog_content FOR DELETE
   USING (auth.uid() = user_id);
 
 -- Logs are viewable by blog owners
+DROP POLICY IF EXISTS "Users can view own blog logs" ON public.seo_blog_generation_logs;
 CREATE POLICY "Users can view own blog logs"
   ON public.seo_blog_generation_logs FOR SELECT
   USING (
@@ -155,11 +160,13 @@ CREATE POLICY "Users can view own blog logs"
   );
 
 -- Reference summaries are readable by authenticated users
+DROP POLICY IF EXISTS "Authenticated users can view reference summaries" ON public.seo_reference_summaries;
 CREATE POLICY "Authenticated users can view reference summaries"
   ON public.seo_reference_summaries FOR SELECT
   USING (auth.role() = 'authenticated');
 
 -- Service role can manage reference summaries (for edge functions)
+DROP POLICY IF EXISTS "Service role can manage reference summaries" ON public.seo_reference_summaries;
 CREATE POLICY "Service role can manage reference summaries"
   ON public.seo_reference_summaries FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');

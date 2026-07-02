@@ -24,6 +24,7 @@ import {
   BookOpen,
   Calculator,
   UsersRound,
+  HeartPulse,
 } from "lucide-react";
 import { useState } from "react";
 import ProfileDropdown from "./ProfileDropdown";
@@ -150,7 +151,8 @@ const Layout = () => {
     // Add Send Weekly Email for PM and above
     if (['pm', 'manager', 'super_admin'].includes(role)) {
       navigation.push(
-        { name: "Send Weekly Email", href: "/weekly-client-email-summary", icon: Mail, current: false, minRole: 'pm' }
+        { name: "Send Weekly Email", href: "/weekly-client-email-summary", icon: Mail, current: false, minRole: 'pm' },
+        { name: "Retention Copilot", href: "/client-retention-copilot", icon: HeartPulse, current: false, minRole: 'pm' }
       );
     }
 

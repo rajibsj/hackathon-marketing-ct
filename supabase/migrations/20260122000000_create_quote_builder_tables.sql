@@ -115,6 +115,7 @@ ALTER TABLE estimate_items ENABLE ROW LEVEL SECURITY;
 -- Service Categories RLS
 -- ================================================
 -- Super admin can do everything
+DROP POLICY IF EXISTS "service_categories_super_admin_all" ON service_categories;
 CREATE POLICY "service_categories_super_admin_all" ON service_categories
   FOR ALL
   TO authenticated
@@ -134,6 +135,7 @@ CREATE POLICY "service_categories_super_admin_all" ON service_categories
   );
 
 -- PM and above can read active categories
+DROP POLICY IF EXISTS "service_categories_pm_read" ON service_categories;
 CREATE POLICY "service_categories_pm_read" ON service_categories
   FOR SELECT
   TO authenticated
@@ -150,6 +152,7 @@ CREATE POLICY "service_categories_pm_read" ON service_categories
 -- Services RLS
 -- ================================================
 -- Super admin can do everything
+DROP POLICY IF EXISTS "services_super_admin_all" ON services;
 CREATE POLICY "services_super_admin_all" ON services
   FOR ALL
   TO authenticated
@@ -169,6 +172,7 @@ CREATE POLICY "services_super_admin_all" ON services
   );
 
 -- PM and above can read active services
+DROP POLICY IF EXISTS "services_pm_read" ON services;
 CREATE POLICY "services_pm_read" ON services
   FOR SELECT
   TO authenticated
@@ -185,6 +189,7 @@ CREATE POLICY "services_pm_read" ON services
 -- Estimates RLS
 -- ================================================
 -- Users can create estimates
+DROP POLICY IF EXISTS "estimates_insert" ON estimates;
 CREATE POLICY "estimates_insert" ON estimates
   FOR INSERT
   TO authenticated
@@ -198,6 +203,7 @@ CREATE POLICY "estimates_insert" ON estimates
   );
 
 -- Users can read their own estimates
+DROP POLICY IF EXISTS "estimates_select_own" ON estimates;
 CREATE POLICY "estimates_select_own" ON estimates
   FOR SELECT
   TO authenticated
@@ -211,6 +217,7 @@ CREATE POLICY "estimates_select_own" ON estimates
   );
 
 -- Super admin can read all estimates
+DROP POLICY IF EXISTS "estimates_super_admin_read" ON estimates;
 CREATE POLICY "estimates_super_admin_read" ON estimates
   FOR SELECT
   TO authenticated
@@ -223,6 +230,7 @@ CREATE POLICY "estimates_super_admin_read" ON estimates
   );
 
 -- Users can update their own estimates
+DROP POLICY IF EXISTS "estimates_update_own" ON estimates;
 CREATE POLICY "estimates_update_own" ON estimates
   FOR UPDATE
   TO authenticated
@@ -244,6 +252,7 @@ CREATE POLICY "estimates_update_own" ON estimates
   );
 
 -- Users can delete their own non-sent estimates, super admin can delete any
+DROP POLICY IF EXISTS "estimates_delete" ON estimates;
 CREATE POLICY "estimates_delete" ON estimates
   FOR DELETE
   TO authenticated
@@ -260,6 +269,7 @@ CREATE POLICY "estimates_delete" ON estimates
 -- Estimate Items RLS
 -- ================================================
 -- Users can manage items for estimates they own
+DROP POLICY IF EXISTS "estimate_items_own_estimate" ON estimate_items;
 CREATE POLICY "estimate_items_own_estimate" ON estimate_items
   FOR ALL
   TO authenticated
@@ -279,6 +289,7 @@ CREATE POLICY "estimate_items_own_estimate" ON estimate_items
   );
 
 -- Super admin can manage all items
+DROP POLICY IF EXISTS "estimate_items_super_admin" ON estimate_items;
 CREATE POLICY "estimate_items_super_admin" ON estimate_items
   FOR ALL
   TO authenticated

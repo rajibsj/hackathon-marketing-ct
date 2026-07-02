@@ -20,6 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_google_drive_folders_created_by ON public.a
 ALTER TABLE public.admin_google_drive_folders ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies - Only super admins and managers can access
+DROP POLICY IF EXISTS "Super admins and managers can view Google Drive folders" ON public.admin_google_drive_folders;
 CREATE POLICY "Super admins and managers can view Google Drive folders"
   ON public.admin_google_drive_folders
   FOR SELECT
@@ -31,6 +32,7 @@ CREATE POLICY "Super admins and managers can view Google Drive folders"
     )
   );
 
+DROP POLICY IF EXISTS "Super admins and managers can insert Google Drive folders" ON public.admin_google_drive_folders;
 CREATE POLICY "Super admins and managers can insert Google Drive folders"
   ON public.admin_google_drive_folders
   FOR INSERT
@@ -42,6 +44,7 @@ CREATE POLICY "Super admins and managers can insert Google Drive folders"
     )
   );
 
+DROP POLICY IF EXISTS "Super admins and managers can update Google Drive folders" ON public.admin_google_drive_folders;
 CREATE POLICY "Super admins and managers can update Google Drive folders"
   ON public.admin_google_drive_folders
   FOR UPDATE
@@ -53,6 +56,7 @@ CREATE POLICY "Super admins and managers can update Google Drive folders"
     )
   );
 
+DROP POLICY IF EXISTS "Super admins and managers can delete Google Drive folders" ON public.admin_google_drive_folders;
 CREATE POLICY "Super admins and managers can delete Google Drive folders"
   ON public.admin_google_drive_folders
   FOR DELETE
@@ -65,6 +69,7 @@ CREATE POLICY "Super admins and managers can delete Google Drive folders"
   );
 
 -- Add updated_at trigger
+DROP TRIGGER IF EXISTS update_admin_google_drive_folders_updated_at ON public.admin_google_drive_folders;
 CREATE TRIGGER update_admin_google_drive_folders_updated_at
   BEFORE UPDATE ON public.admin_google_drive_folders
   FOR EACH ROW

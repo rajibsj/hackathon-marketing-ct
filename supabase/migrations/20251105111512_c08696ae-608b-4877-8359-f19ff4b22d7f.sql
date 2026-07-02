@@ -1,5 +1,5 @@
 -- Create project knowledge sources table
-CREATE TABLE public.project_knowledge_sources (
+CREATE TABLE IF NOT EXISTS public.project_knowledge_sources (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE public.project_knowledge_sources (
 );
 
 -- Create project knowledge files table
-CREATE TABLE public.project_knowledge_files (
+CREATE TABLE IF NOT EXISTS public.project_knowledge_files (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   source_id UUID NOT NULL REFERENCES public.project_knowledge_sources(id) ON DELETE CASCADE,
@@ -32,6 +32,7 @@ ALTER TABLE public.project_knowledge_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.project_knowledge_files ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for project_knowledge_sources
+DROP POLICY IF EXISTS "Users can view sources for their projects" ON public.project_knowledge_sources;
 CREATE POLICY "Users can view sources for their projects"
   ON public.project_knowledge_sources FOR SELECT
   USING (
@@ -44,6 +45,7 @@ CREATE POLICY "Users can view sources for their projects"
     )
   );
 
+DROP POLICY IF EXISTS "Users can manage sources for their projects" ON public.project_knowledge_sources;
 CREATE POLICY "Users can manage sources for their projects"
   ON public.project_knowledge_sources FOR ALL
   USING (
@@ -57,6 +59,7 @@ CREATE POLICY "Users can manage sources for their projects"
   );
 
 -- RLS Policies for project_knowledge_files
+DROP POLICY IF EXISTS "Users can view files for their projects" ON public.project_knowledge_files;
 CREATE POLICY "Users can view files for their projects"
   ON public.project_knowledge_files FOR SELECT
   USING (
@@ -69,6 +72,7 @@ CREATE POLICY "Users can view files for their projects"
     )
   );
 
+DROP POLICY IF EXISTS "Users can manage files for their projects" ON public.project_knowledge_files;
 CREATE POLICY "Users can manage files for their projects"
   ON public.project_knowledge_files FOR ALL
   USING (
@@ -82,16 +86,18 @@ CREATE POLICY "Users can manage files for their projects"
   );
 
 -- Create indexes
-CREATE INDEX idx_project_knowledge_sources_project_id ON public.project_knowledge_sources(project_id);
-CREATE INDEX idx_project_knowledge_files_project_id ON public.project_knowledge_files(project_id);
-CREATE INDEX idx_project_knowledge_files_source_id ON public.project_knowledge_files(source_id);
+CREATE INDEX IF NOT EXISTS idx_project_knowledge_sources_project_id ON public.project_knowledge_sources(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_knowledge_files_project_id ON public.project_knowledge_files(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_knowledge_files_source_id ON public.project_knowledge_files(source_id);
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS update_project_knowledge_sources_updated_at ON public.project_knowledge_sources;
 CREATE TRIGGER update_project_knowledge_sources_updated_at
   BEFORE UPDATE ON public.project_knowledge_sources
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_project_knowledge_files_updated_at ON public.project_knowledge_files;
 CREATE TRIGGER update_project_knowledge_files_updated_at
   BEFORE UPDATE ON public.project_knowledge_files
   FOR EACH ROW

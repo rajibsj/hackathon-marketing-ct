@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.activecollab_credentials (
 ALTER TABLE public.activecollab_credentials ENABLE ROW LEVEL SECURITY;
 
 -- Only super admins can access credentials
+DROP POLICY IF EXISTS "Super admins can manage ActiveCollab credentials" ON public.activecollab_credentials;
 CREATE POLICY "Super admins can manage ActiveCollab credentials"
   ON public.activecollab_credentials
   FOR ALL
@@ -27,6 +28,7 @@ CREATE POLICY "Super admins can manage ActiveCollab credentials"
   );
 
 -- Update trigger
+DROP TRIGGER IF EXISTS update_activecollab_credentials_updated_at ON public.activecollab_credentials;
 CREATE TRIGGER update_activecollab_credentials_updated_at
   BEFORE UPDATE ON public.activecollab_credentials
   FOR EACH ROW

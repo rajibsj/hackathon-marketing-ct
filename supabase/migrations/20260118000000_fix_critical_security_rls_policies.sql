@@ -48,6 +48,7 @@ $$;
 -- ============================================================================
 DROP POLICY IF EXISTS "All authenticated users can create feedback" ON public.feedback_reports;
 
+DROP POLICY IF EXISTS "Users can create feedback (no impersonation)" ON public.feedback_reports;
 CREATE POLICY "Users can create feedback (no impersonation)"
   ON public.feedback_reports FOR INSERT
   TO authenticated
@@ -89,17 +90,20 @@ CREATE POLICY "Admins can view ActiveCollab settings"
   TO authenticated
   USING (public.is_admin_or_superadmin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can insert ActiveCollab settings" ON public.user_activecollab_settings;
 CREATE POLICY "Admins can insert ActiveCollab settings"
   ON public.user_activecollab_settings FOR INSERT
   TO authenticated
   WITH CHECK (public.is_admin_or_superadmin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can update ActiveCollab settings" ON public.user_activecollab_settings;
 CREATE POLICY "Admins can update ActiveCollab settings"
   ON public.user_activecollab_settings FOR UPDATE
   TO authenticated
   USING (public.is_admin_or_superadmin(auth.uid()))
   WITH CHECK (public.is_admin_or_superadmin(auth.uid()));
 
+DROP POLICY IF EXISTS "Admins can delete ActiveCollab settings" ON public.user_activecollab_settings;
 CREATE POLICY "Admins can delete ActiveCollab settings"
   ON public.user_activecollab_settings FOR DELETE
   TO authenticated
@@ -152,6 +156,7 @@ SELECT
 FROM public.brand_analytics_integrations;
 
 -- Only admin/superadmin can access the full table with sensitive columns
+DROP POLICY IF EXISTS "Admins can manage brand analytics integrations" ON public.brand_analytics_integrations;
 CREATE POLICY "Admins can manage brand analytics integrations"
   ON public.brand_analytics_integrations FOR ALL
   TO authenticated
@@ -179,6 +184,7 @@ SELECT
 FROM public.gohighlevel_integrations;
 
 -- Only admin/superadmin can access the full table with api_key_encrypted
+DROP POLICY IF EXISTS "Admins can manage GoHighLevel integrations" ON public.gohighlevel_integrations;
 CREATE POLICY "Admins can manage GoHighLevel integrations"
   ON public.gohighlevel_integrations FOR ALL
   TO authenticated
@@ -209,6 +215,7 @@ SELECT
 FROM public.control_tower_api_keys;
 
 -- Only superadmin can access the full table with api_key_encrypted
+DROP POLICY IF EXISTS "Super admins can manage control tower API keys" ON public.control_tower_api_keys;
 CREATE POLICY "Super admins can manage control tower API keys"
   ON public.control_tower_api_keys FOR ALL
   TO authenticated
@@ -236,6 +243,7 @@ SELECT
 FROM public.n8n_workflow_configs;
 
 -- Only superadmin can access the full table with api_key_encrypted
+DROP POLICY IF EXISTS "Super admins can manage n8n workflow configs" ON public.n8n_workflow_configs;
 CREATE POLICY "Super admins can manage n8n workflow configs"
   ON public.n8n_workflow_configs FOR ALL
   TO authenticated

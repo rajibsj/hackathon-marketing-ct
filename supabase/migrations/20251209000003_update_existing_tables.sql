@@ -15,7 +15,7 @@ ALTER TABLE knowledge_files
   ADD COLUMN IF NOT EXISTS embedding_count INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS reindex_required BOOLEAN DEFAULT FALSE;
 
--- Create index for reindexing queries
+-- CREATE INDEX IF NOT EXISTS for reindexing queries
 CREATE INDEX IF NOT EXISTS knowledge_files_reindex_idx
   ON knowledge_files(reindex_required)
   WHERE reindex_required = TRUE;
@@ -38,7 +38,7 @@ ALTER TABLE brand_knowledge_files
   ADD COLUMN IF NOT EXISTS embedding_count INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS reindex_required BOOLEAN DEFAULT FALSE;
 
--- Create index for reindexing queries
+-- CREATE INDEX IF NOT EXISTS for reindexing queries
 CREATE INDEX IF NOT EXISTS brand_files_reindex_idx
   ON brand_knowledge_files(reindex_required)
   WHERE reindex_required = TRUE;
@@ -47,13 +47,25 @@ COMMENT ON COLUMN brand_knowledge_files.embedding_count IS 'Number of embeddings
 COMMENT ON COLUMN brand_knowledge_files.reindex_required IS 'Flag to trigger re-indexing';
 
 -- ============================================================================
--- UPDATE company_knowledge_categories TABLE
+-- UPDATE knowledge categories TABLE (renamed to knowledge_base_categories in 20251104204700)
 -- Remove ChromaDB collection reference
 -- ============================================================================
 
--- Drop ChromaDB collection column
-ALTER TABLE company_knowledge_categories
-  DROP COLUMN IF EXISTS chroma_collection;
-
--- Note: Categories are now referenced by UUID in search functions
-COMMENT ON TABLE company_knowledge_categories IS 'Knowledge categories, linked to embeddings via knowledge_sources';
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'knowledge_base_categories'
+  ) THEN
+    ALTER TABLE public.knowledge_base_categories
+      DROP COLUMN IF EXISTS chroma_collection;
+    COMMENT ON TABLE public.knowledge_base_categories IS 'Knowledge categories, linked to embeddings via knowledge_sources';
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'company_knowledge_categories'
+  ) THEN
+    ALTER TABLE public.company_knowledge_categories
+      DROP COLUMN IF EXISTS chroma_collection;
+    COMMENT ON TABLE public.company_knowledge_categories IS 'Knowledge categories, linked to embeddings via knowledge_sources';
+  END IF;
+END $$;

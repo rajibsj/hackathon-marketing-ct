@@ -12,6 +12,7 @@ ON CONFLICT (id) DO NOTHING;
 -- RLS Policies for sora-videos bucket
 
 -- Users can view their own videos
+DROP POLICY IF EXISTS "Users can view own sora videos" ON storage;
 CREATE POLICY "Users can view own sora videos"
 ON storage.objects FOR SELECT
 TO authenticated
@@ -21,6 +22,7 @@ USING (
 );
 
 -- Users can upload their own videos
+DROP POLICY IF EXISTS "Users can upload own sora videos" ON storage;
 CREATE POLICY "Users can upload own sora videos"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -30,6 +32,7 @@ WITH CHECK (
 );
 
 -- Users can delete their own videos
+DROP POLICY IF EXISTS "Users can delete own sora videos" ON storage;
 CREATE POLICY "Users can delete own sora videos"
 ON storage.objects FOR DELETE
 TO authenticated
@@ -39,6 +42,7 @@ USING (
 );
 
 -- Service role has full access (for edge function uploads)
+DROP POLICY IF EXISTS "Service role has full access to sora videos" ON storage;
 CREATE POLICY "Service role has full access to sora videos"
 ON storage.objects FOR ALL
 TO service_role

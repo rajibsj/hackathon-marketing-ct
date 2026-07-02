@@ -39,6 +39,7 @@ ALTER TABLE public.keyword_research ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.keyword_suggestions ENABLE ROW LEVEL SECURITY;
 
 -- Permissive policies for authenticated users
+DROP POLICY IF EXISTS "Authenticated users can manage keyword_blog_usage" ON public.keyword_blog_usage;
 CREATE POLICY "Authenticated users can manage keyword_blog_usage"
   ON public.keyword_blog_usage
   FOR ALL

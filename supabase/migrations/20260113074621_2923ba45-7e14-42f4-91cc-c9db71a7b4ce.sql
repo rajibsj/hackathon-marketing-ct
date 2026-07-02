@@ -1,5 +1,5 @@
 -- Agent execution steps for audit trail and transparency
-CREATE TABLE public.agent_execution_steps (
+CREATE TABLE IF NOT EXISTS public.agent_execution_steps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id UUID REFERENCES public.ai_agent_runs(id) ON DELETE CASCADE,
   step_number INTEGER NOT NULL,
@@ -13,13 +13,14 @@ CREATE TABLE public.agent_execution_steps (
 );
 
 -- Index for efficient step retrieval
-CREATE INDEX idx_agent_execution_steps_run_id ON public.agent_execution_steps(run_id);
-CREATE INDEX idx_agent_execution_steps_created_at ON public.agent_execution_steps(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_execution_steps_run_id ON public.agent_execution_steps(run_id);
+CREATE INDEX IF NOT EXISTS idx_agent_execution_steps_created_at ON public.agent_execution_steps(created_at DESC);
 
 -- Enable RLS
 ALTER TABLE public.agent_execution_steps ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for agent execution steps
+DROP POLICY IF EXISTS "Users can view execution steps for their runs" ON public.agent_execution_steps;
 CREATE POLICY "Users can view execution steps for their runs"
   ON public.agent_execution_steps FOR SELECT
   USING (
@@ -28,6 +29,7 @@ CREATE POLICY "Users can view execution steps for their runs"
     )
   );
 
+DROP POLICY IF EXISTS "Super admins can view all execution steps" ON public.agent_execution_steps;
 CREATE POLICY "Super admins can view all execution steps"
   ON public.agent_execution_steps FOR SELECT
   USING (
@@ -38,7 +40,7 @@ CREATE POLICY "Super admins can view all execution steps"
   );
 
 -- Agent approvals for human-in-the-loop actions
-CREATE TABLE public.agent_pending_approvals (
+CREATE TABLE IF NOT EXISTS public.agent_pending_approvals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id UUID REFERENCES public.ai_agent_runs(id) ON DELETE CASCADE,
   step_id UUID REFERENCES public.agent_execution_steps(id) ON DELETE CASCADE,
@@ -55,18 +57,20 @@ CREATE TABLE public.agent_pending_approvals (
 );
 
 -- Indexes for approval workflow
-CREATE INDEX idx_agent_approvals_run_id ON public.agent_pending_approvals(run_id);
-CREATE INDEX idx_agent_approvals_pending ON public.agent_pending_approvals(resolution) WHERE resolution IS NULL;
-CREATE INDEX idx_agent_approvals_requested_by ON public.agent_pending_approvals(requested_by);
+CREATE INDEX IF NOT EXISTS idx_agent_approvals_run_id ON public.agent_pending_approvals(run_id);
+CREATE INDEX IF NOT EXISTS idx_agent_approvals_pending ON public.agent_pending_approvals(resolution) WHERE resolution IS NULL;
+CREATE INDEX IF NOT EXISTS idx_agent_approvals_requested_by ON public.agent_pending_approvals(requested_by);
 
 -- Enable RLS
 ALTER TABLE public.agent_pending_approvals ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for approvals
+DROP POLICY IF EXISTS "Users can view their approval requests" ON public.agent_pending_approvals;
 CREATE POLICY "Users can view their approval requests"
   ON public.agent_pending_approvals FOR SELECT
   USING (requested_by = auth.uid());
 
+DROP POLICY IF EXISTS "Managers and super admins can view all approvals" ON public.agent_pending_approvals;
 CREATE POLICY "Managers and super admins can view all approvals"
   ON public.agent_pending_approvals FOR SELECT
   USING (
@@ -76,11 +80,13 @@ CREATE POLICY "Managers and super admins can view all approvals"
     )
   );
 
+DROP POLICY IF EXISTS "Users can resolve their own approval requests" ON public.agent_pending_approvals;
 CREATE POLICY "Users can resolve their own approval requests"
   ON public.agent_pending_approvals FOR UPDATE
   USING (requested_by = auth.uid())
   WITH CHECK (requested_by = auth.uid());
 
+DROP POLICY IF EXISTS "Managers can resolve any approval" ON public.agent_pending_approvals;
 CREATE POLICY "Managers can resolve any approval"
   ON public.agent_pending_approvals FOR UPDATE
   USING (
@@ -91,7 +97,7 @@ CREATE POLICY "Managers can resolve any approval"
   );
 
 -- Agent session memory for cross-run context
-CREATE TABLE public.agent_session_memory (
+CREATE TABLE IF NOT EXISTS public.agent_session_memory (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id UUID REFERENCES public.ai_agents(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -108,19 +114,21 @@ CREATE TABLE public.agent_session_memory (
 );
 
 -- Indexes for efficient memory lookup
-CREATE INDEX idx_agent_memory_lookup ON public.agent_session_memory(agent_id, user_id, memory_key);
-CREATE INDEX idx_agent_memory_type ON public.agent_session_memory(agent_id, memory_type);
-CREATE INDEX idx_agent_memory_importance ON public.agent_session_memory(importance_score DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_memory_lookup ON public.agent_session_memory(agent_id, user_id, memory_key);
+CREATE INDEX IF NOT EXISTS idx_agent_memory_type ON public.agent_session_memory(agent_id, memory_type);
+CREATE INDEX IF NOT EXISTS idx_agent_memory_importance ON public.agent_session_memory(importance_score DESC);
 
 -- Enable RLS
 ALTER TABLE public.agent_session_memory ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for agent memory
+DROP POLICY IF EXISTS "Users can manage their own agent memories" ON public.agent_session_memory;
 CREATE POLICY "Users can manage their own agent memories"
   ON public.agent_session_memory FOR ALL
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Super admins can view all memories" ON public.agent_session_memory;
 CREATE POLICY "Super admins can view all memories"
   ON public.agent_session_memory FOR SELECT
   USING (
@@ -131,7 +139,7 @@ CREATE POLICY "Super admins can view all memories"
   );
 
 -- Agent tool definitions for dynamic tool registry
-CREATE TABLE public.agent_tool_definitions (
+CREATE TABLE IF NOT EXISTS public.agent_tool_definitions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id UUID REFERENCES public.ai_agents(id) ON DELETE CASCADE,
   tool_name TEXT NOT NULL,
@@ -151,10 +159,12 @@ CREATE TABLE public.agent_tool_definitions (
 ALTER TABLE public.agent_tool_definitions ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies
+DROP POLICY IF EXISTS "Anyone can view tool definitions" ON public.agent_tool_definitions;
 CREATE POLICY "Anyone can view tool definitions"
   ON public.agent_tool_definitions FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Super admins can manage tool definitions" ON public.agent_tool_definitions;
 CREATE POLICY "Super admins can manage tool definitions"
   ON public.agent_tool_definitions FOR ALL
   USING (
@@ -173,11 +183,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_agent_session_memory_updated_at ON public.agent_session_memory;
 CREATE TRIGGER update_agent_session_memory_updated_at
   BEFORE UPDATE ON public.agent_session_memory
   FOR EACH ROW
   EXECUTE FUNCTION public.update_agent_memory_timestamp();
 
+DROP TRIGGER IF EXISTS update_agent_tool_definitions_updated_at ON public.agent_tool_definitions;
 CREATE TRIGGER update_agent_tool_definitions_updated_at
   BEFORE UPDATE ON public.agent_tool_definitions
   FOR EACH ROW

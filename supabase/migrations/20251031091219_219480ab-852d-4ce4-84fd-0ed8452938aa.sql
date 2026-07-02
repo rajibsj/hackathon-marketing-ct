@@ -16,6 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_post_agent_references_agent_id ON public.post_age
 ALTER TABLE public.post_agent_references ENABLE ROW LEVEL SECURITY;
 
 -- Allow team members to view agent references for posts they can access
+DROP POLICY IF EXISTS "Team members can view post agent references" ON public.post_agent_references;
 CREATE POLICY "Team members can view post agent references"
 ON public.post_agent_references
 FOR SELECT
@@ -32,6 +33,7 @@ USING (
 );
 
 -- Allow team members to create agent references for their posts
+DROP POLICY IF EXISTS "Team members can create post agent references" ON public.post_agent_references;
 CREATE POLICY "Team members can create post agent references"
 ON public.post_agent_references
 FOR INSERT
@@ -48,6 +50,7 @@ WITH CHECK (
 );
 
 -- Allow deletion of agent references
+DROP POLICY IF EXISTS "Team members can delete post agent references" ON public.post_agent_references;
 CREATE POLICY "Team members can delete post agent references"
 ON public.post_agent_references
 FOR DELETE

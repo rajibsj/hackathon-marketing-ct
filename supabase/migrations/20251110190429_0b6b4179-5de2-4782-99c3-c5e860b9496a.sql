@@ -8,6 +8,6 @@ ADD CONSTRAINT project_knowledge_files_source_file_unique
 UNIQUE (source_id, file_name);
 
 -- Create unique constraint on source_id and external_id (for Google Drive files)
-CREATE UNIQUE INDEX project_knowledge_files_source_external_unique 
+CREATE UNIQUE INDEX IF NOT EXISTS project_knowledge_files_source_external_unique 
 ON public.project_knowledge_files (source_id, external_id) 
 WHERE external_id IS NOT NULL;

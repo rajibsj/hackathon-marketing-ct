@@ -5,7 +5,7 @@ ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'content_creator';
 ALTER TABLE public.thought_leaders 
 ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
 
--- Create index for faster lookups
+-- CREATE INDEX IF NOT EXISTS for faster lookups
 CREATE INDEX IF NOT EXISTS idx_thought_leaders_user_id ON public.thought_leaders(user_id);
 
 -- Step 3: Drop existing policies on thought_leaders if they exist (to recreate with new logic)
@@ -27,6 +27,7 @@ USING (
 );
 
 -- Content creators can update their own thought leader profile (guide_text, persona, etc.)
+DROP POLICY IF EXISTS "Content creators can update own leader profile" ON public.thought_leaders;
 CREATE POLICY "Content creators can update own leader profile"
 ON public.thought_leaders
 FOR UPDATE
@@ -50,6 +51,7 @@ USING (
 );
 
 -- Content creators can insert posts for themselves
+DROP POLICY IF EXISTS "Content creators can insert own generated posts" ON public.generated_posts;
 CREATE POLICY "Content creators can insert own generated posts"
 ON public.generated_posts
 FOR INSERT
@@ -76,6 +78,7 @@ USING (
 );
 
 -- Content creators can upload documents for themselves
+DROP POLICY IF EXISTS "Content creators can insert own uploads" ON public.leader_uploads;
 CREATE POLICY "Content creators can insert own uploads"
 ON public.leader_uploads
 FOR INSERT

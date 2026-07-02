@@ -64,10 +64,12 @@ CREATE POLICY "Users can create blogs"
   ON public.seo_blog_content FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own blogs" ON public.seo_blog_content;
 CREATE POLICY "Users can update own blogs"
   ON public.seo_blog_content FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own blogs" ON public.seo_blog_content;
 CREATE POLICY "Users can delete own blogs"
   ON public.seo_blog_content FOR DELETE
   USING (auth.uid() = user_id);

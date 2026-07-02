@@ -51,18 +51,22 @@ ALTER TABLE activecollab_task_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE team_daily_summaries ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for team_eod_submissions
+DROP POLICY IF EXISTS "Users can view their own EOD submissions" ON team_eod_submissions;
 CREATE POLICY "Users can view their own EOD submissions"
   ON team_eod_submissions FOR SELECT
   USING (user_id::text = auth.uid()::text);
 
+DROP POLICY IF EXISTS "Users can insert their own EOD submissions" ON team_eod_submissions;
 CREATE POLICY "Users can insert their own EOD submissions"
   ON team_eod_submissions FOR INSERT
   WITH CHECK (user_id::text = auth.uid()::text);
 
+DROP POLICY IF EXISTS "Users can update their own EOD submissions" ON team_eod_submissions;
 CREATE POLICY "Users can update their own EOD submissions"
   ON team_eod_submissions FOR UPDATE
   USING (user_id::text = auth.uid()::text);
 
+DROP POLICY IF EXISTS "Managers can view all EOD submissions" ON team_eod_submissions;
 CREATE POLICY "Managers can view all EOD submissions"
   ON team_eod_submissions FOR SELECT
   USING (
@@ -74,10 +78,12 @@ CREATE POLICY "Managers can view all EOD submissions"
   );
 
 -- RLS Policies for activecollab_task_data
+DROP POLICY IF EXISTS "Users can view tasks assigned to them" ON activecollab_task_data;
 CREATE POLICY "Users can view tasks assigned to them"
   ON activecollab_task_data FOR SELECT
   USING (assignee_id::text = auth.uid()::text);
 
+DROP POLICY IF EXISTS "Managers can view all task data" ON activecollab_task_data;
 CREATE POLICY "Managers can view all task data"
   ON activecollab_task_data FOR SELECT
   USING (
@@ -88,15 +94,18 @@ CREATE POLICY "Managers can view all task data"
     )
   );
 
+DROP POLICY IF EXISTS "Service role can manage task data" ON activecollab_task_data;
 CREATE POLICY "Service role can manage task data"
   ON activecollab_task_data FOR ALL
   USING (auth.jwt()->>'role' = 'service_role');
 
 -- RLS Policies for team_daily_summaries
+DROP POLICY IF EXISTS "Users can view their own summaries" ON team_daily_summaries;
 CREATE POLICY "Users can view their own summaries"
   ON team_daily_summaries FOR SELECT
   USING (user_id::text = auth.uid()::text);
 
+DROP POLICY IF EXISTS "Managers can view all summaries" ON team_daily_summaries;
 CREATE POLICY "Managers can view all summaries"
   ON team_daily_summaries FOR SELECT
   USING (
@@ -107,27 +116,31 @@ CREATE POLICY "Managers can view all summaries"
     )
   );
 
+DROP POLICY IF EXISTS "Service role can manage summaries" ON team_daily_summaries;
 CREATE POLICY "Service role can manage summaries"
   ON team_daily_summaries FOR ALL
   USING (auth.jwt()->>'role' = 'service_role');
 
 -- Create indexes for better performance
-CREATE INDEX idx_eod_submissions_user_date ON team_eod_submissions(user_id, submission_date DESC);
-CREATE INDEX idx_eod_submissions_date ON team_eod_submissions(submission_date DESC);
-CREATE INDEX idx_activecollab_sync_date ON activecollab_task_data(sync_date DESC);
-CREATE INDEX idx_activecollab_assignee ON activecollab_task_data(assignee_id);
-CREATE INDEX idx_daily_summaries_user_date ON team_daily_summaries(user_id, summary_date DESC);
-CREATE INDEX idx_daily_summaries_date ON team_daily_summaries(summary_date DESC);
+CREATE INDEX IF NOT EXISTS idx_eod_submissions_user_date ON team_eod_submissions(user_id, submission_date DESC);
+CREATE INDEX IF NOT EXISTS idx_eod_submissions_date ON team_eod_submissions(submission_date DESC);
+CREATE INDEX IF NOT EXISTS idx_activecollab_sync_date ON activecollab_task_data(sync_date DESC);
+CREATE INDEX IF NOT EXISTS idx_activecollab_assignee ON activecollab_task_data(assignee_id);
+CREATE INDEX IF NOT EXISTS idx_daily_summaries_user_date ON team_daily_summaries(user_id, summary_date DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON team_daily_summaries(summary_date DESC);
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_eod_submissions_updated_at ON team_eod_submissions;
 CREATE TRIGGER update_eod_submissions_updated_at
   BEFORE UPDATE ON team_eod_submissions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_activecollab_task_data_updated_at ON activecollab_task_data;
 CREATE TRIGGER update_activecollab_task_data_updated_at
   BEFORE UPDATE ON activecollab_task_data
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_team_daily_summaries_updated_at ON team_daily_summaries;
 CREATE TRIGGER update_team_daily_summaries_updated_at
   BEFORE UPDATE ON team_daily_summaries
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -8,6 +8,7 @@ CREATE INDEX IF NOT EXISTS idx_project_tasks_category ON public.project_tasks(ca
 CREATE INDEX IF NOT EXISTS idx_project_tasks_brand_id ON public.project_tasks(brand_id);
 
 -- Add RLS policy for brand-based access (users with brand access can view related tasks)
+DROP POLICY IF EXISTS "Users can view tasks for their brands" ON public.project_tasks;
 CREATE POLICY "Users can view tasks for their brands" 
 ON public.project_tasks 
 FOR SELECT 

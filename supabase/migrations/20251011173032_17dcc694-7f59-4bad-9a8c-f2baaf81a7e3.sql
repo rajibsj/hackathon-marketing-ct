@@ -15,11 +15,13 @@ CREATE TABLE IF NOT EXISTS public.perplexity_settings (
 ALTER TABLE public.perplexity_settings ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies
+DROP POLICY IF EXISTS "Users can view their own settings" ON public.perplexity_settings;
 CREATE POLICY "Users can view their own settings"
 ON public.perplexity_settings FOR SELECT
 TO authenticated
 USING (user_id = auth.uid() OR has_role(auth.uid(), 'super_admin'::app_role));
 
+DROP POLICY IF EXISTS "Users can manage their own settings" ON public.perplexity_settings;
 CREATE POLICY "Users can manage their own settings"
 ON public.perplexity_settings FOR ALL
 TO authenticated
@@ -27,6 +29,7 @@ USING (user_id = auth.uid() OR has_role(auth.uid(), 'super_admin'::app_role))
 WITH CHECK (user_id = auth.uid() OR has_role(auth.uid(), 'super_admin'::app_role));
 
 -- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_perplexity_settings_updated_at ON public.perplexity_settings;
 CREATE TRIGGER update_perplexity_settings_updated_at
   BEFORE UPDATE ON public.perplexity_settings
   FOR EACH ROW

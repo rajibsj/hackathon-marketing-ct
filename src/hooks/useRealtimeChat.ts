@@ -67,7 +67,7 @@ export const useRealtimeChat = ({ leaderId, systemPrompt, onPostGenerated }: Use
       const promptToUse = explicitSystemPrompt || systemPrompt;
 
       const response = await fetch(
-        'https://fzknasqrludvoyxdzbxl.supabase.co/functions/v1/linkedin-chat-stream',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/linkedin-chat-stream`,
         {
           method: 'POST',
           headers: {

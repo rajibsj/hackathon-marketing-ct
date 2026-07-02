@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS brand_knowledge_files (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_brand_knowledge_brand ON brand_knowledge_files(brand_id);
-CREATE INDEX idx_brand_knowledge_indexed ON brand_knowledge_files(openai_file_id) WHERE openai_file_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_brand_knowledge_brand ON brand_knowledge_files(brand_id);
+CREATE INDEX IF NOT EXISTS idx_brand_knowledge_indexed ON brand_knowledge_files(openai_file_id) WHERE openai_file_id IS NOT NULL;
 
 -- Create brand_file_comments table for team collaboration
 CREATE TABLE IF NOT EXISTS brand_file_comments (
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS brand_file_comments (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_brand_file_comments_file ON brand_file_comments(file_id);
-CREATE INDEX idx_brand_file_comments_user ON brand_file_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_brand_file_comments_file ON brand_file_comments(file_id);
+CREATE INDEX IF NOT EXISTS idx_brand_file_comments_user ON brand_file_comments(user_id);
 
 -- Add brand_id to thought_leaders to link leaders to brands
 ALTER TABLE thought_leaders 
@@ -51,12 +51,13 @@ CREATE TABLE IF NOT EXISTS brand_generated_posts (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_brand_posts_brand ON brand_generated_posts(brand_id);
-CREATE INDEX idx_brand_posts_leader ON brand_generated_posts(leader_id);
+CREATE INDEX IF NOT EXISTS idx_brand_posts_brand ON brand_generated_posts(brand_id);
+CREATE INDEX IF NOT EXISTS idx_brand_posts_leader ON brand_generated_posts(leader_id);
 
 -- RLS Policies for brand_knowledge_files
 ALTER TABLE brand_knowledge_files ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Team members can view brand knowledge" ON brand_knowledge_files;
 CREATE POLICY "Team members can view brand knowledge" ON brand_knowledge_files
 FOR SELECT USING (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -64,6 +65,7 @@ FOR SELECT USING (
   has_role(auth.uid(), 'manager'::app_role)
 );
 
+DROP POLICY IF EXISTS "Team members can upload brand knowledge" ON brand_knowledge_files;
 CREATE POLICY "Team members can upload brand knowledge" ON brand_knowledge_files
 FOR INSERT WITH CHECK (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -71,6 +73,7 @@ FOR INSERT WITH CHECK (
   has_role(auth.uid(), 'manager'::app_role)
 );
 
+DROP POLICY IF EXISTS "Team members can update brand knowledge" ON brand_knowledge_files;
 CREATE POLICY "Team members can update brand knowledge" ON brand_knowledge_files
 FOR UPDATE USING (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -78,6 +81,7 @@ FOR UPDATE USING (
   has_role(auth.uid(), 'manager'::app_role)
 );
 
+DROP POLICY IF EXISTS "Team members can delete brand knowledge" ON brand_knowledge_files;
 CREATE POLICY "Team members can delete brand knowledge" ON brand_knowledge_files
 FOR DELETE USING (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -88,6 +92,8 @@ FOR DELETE USING (
 -- RLS Policies for brand_file_comments
 ALTER TABLE brand_file_comments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Team members can view comments on brand files" ON brand_file_comments;
+DROP POLICY IF EXISTS "Team members can view comments on brand files" ON brand;
 CREATE POLICY "Team members can view comments on brand files" ON brand_file_comments
 FOR SELECT USING (
   EXISTS (
@@ -101,6 +107,7 @@ FOR SELECT USING (
   )
 );
 
+DROP POLICY IF EXISTS "Team members can add comments to brand files" ON brand_file_comments;
 CREATE POLICY "Team members can add comments to brand files" ON brand_file_comments
 FOR INSERT WITH CHECK (
   auth.uid() = user_id AND
@@ -115,12 +122,14 @@ FOR INSERT WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Users can delete their own comments" ON brand_file_comments;
 CREATE POLICY "Users can delete their own comments" ON brand_file_comments
 FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for brand_generated_posts
 ALTER TABLE brand_generated_posts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Team members can view brand posts" ON brand_generated_posts;
 CREATE POLICY "Team members can view brand posts" ON brand_generated_posts
 FOR SELECT USING (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -128,6 +137,7 @@ FOR SELECT USING (
   has_role(auth.uid(), 'manager'::app_role)
 );
 
+DROP POLICY IF EXISTS "Team members can create brand posts" ON brand_generated_posts;
 CREATE POLICY "Team members can create brand posts" ON brand_generated_posts
 FOR INSERT WITH CHECK (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -135,6 +145,7 @@ FOR INSERT WITH CHECK (
   has_role(auth.uid(), 'manager'::app_role)
 );
 
+DROP POLICY IF EXISTS "Team members can update brand posts" ON brand_generated_posts;
 CREATE POLICY "Team members can update brand posts" ON brand_generated_posts
 FOR UPDATE USING (
   user_has_brand_access(auth.uid(), brand_id) OR
@@ -142,6 +153,7 @@ FOR UPDATE USING (
   has_role(auth.uid(), 'manager'::app_role)
 );
 
+DROP POLICY IF EXISTS "Team members can delete brand posts" ON brand_generated_posts;
 CREATE POLICY "Team members can delete brand posts" ON brand_generated_posts
 FOR DELETE USING (
   user_has_brand_access(auth.uid(), brand_id) OR

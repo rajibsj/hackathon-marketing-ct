@@ -91,18 +91,21 @@ CREATE INDEX IF NOT EXISTS idx_reel_hook_generations_created_at ON public.reel_h
 ALTER TABLE public.reel_hook_generations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own generations
+DROP POLICY IF EXISTS "Users can view their own reel hook generations" ON public.reel_hook_generations;
 CREATE POLICY "Users can view their own reel hook generations"
   ON public.reel_hook_generations
   FOR SELECT
   USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can insert their own generations
+DROP POLICY IF EXISTS "Users can create reel hook generations" ON public.reel_hook_generations;
 CREATE POLICY "Users can create reel hook generations"
   ON public.reel_hook_generations
   FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policy: Users can update their own generations
+DROP POLICY IF EXISTS "Users can update their own reel hook generations" ON public.reel_hook_generations;
 CREATE POLICY "Users can update their own reel hook generations"
   ON public.reel_hook_generations
   FOR UPDATE
@@ -110,6 +113,7 @@ CREATE POLICY "Users can update their own reel hook generations"
   WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policy: Users can delete their own generations
+DROP POLICY IF EXISTS "Users can delete their own reel hook generations" ON public.reel_hook_generations;
 CREATE POLICY "Users can delete their own reel hook generations"
   ON public.reel_hook_generations
   FOR DELETE
@@ -155,6 +159,7 @@ CREATE INDEX IF NOT EXISTS idx_reel_hook_logs_created_at ON public.reel_hook_gen
 ALTER TABLE public.reel_hook_generation_logs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view logs for their own generations
+DROP POLICY IF EXISTS "Users can view their reel hook generation logs" ON public.reel_hook_generation_logs;
 CREATE POLICY "Users can view their reel hook generation logs"
   ON public.reel_hook_generation_logs
   FOR SELECT
@@ -167,6 +172,7 @@ CREATE POLICY "Users can view their reel hook generation logs"
   );
 
 -- RLS Policy: Users can insert logs for their own generations
+DROP POLICY IF EXISTS "Users can create reel hook generation logs" ON public.reel_hook_generation_logs;
 CREATE POLICY "Users can create reel hook generation logs"
   ON public.reel_hook_generation_logs
   FOR INSERT

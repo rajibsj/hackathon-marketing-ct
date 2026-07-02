@@ -41,17 +41,17 @@ ALTER TABLE agent_memories
 -- Step 4: Recreate indexes with IVFFlat for efficient similarity search
 -- ─────────────────────────────────────────────────────────────────
 
-CREATE INDEX knowledge_embeddings_embedding_idx
+CREATE INDEX IF NOT EXISTS knowledge_embeddings_embedding_idx
   ON knowledge_embeddings
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 
-CREATE INDEX brand_knowledge_embeddings_embedding_idx
+CREATE INDEX IF NOT EXISTS brand_knowledge_embeddings_embedding_idx
   ON brand_knowledge_embeddings
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 
-CREATE INDEX agent_memories_embedding_idx
+CREATE INDEX IF NOT EXISTS agent_memories_embedding_idx
   ON agent_memories
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
@@ -59,6 +59,24 @@ CREATE INDEX agent_memories_embedding_idx
 -- ─────────────────────────────────────────────────────────────────
 -- Step 5: Update RPC functions for 768-dimension vectors
 -- ─────────────────────────────────────────────────────────────────
+
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT p.oid::regprocedure AS func
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'search_knowledge_embeddings',
+        'match_brand_knowledge_embeddings',
+        'match_agent_memories'
+      )
+  LOOP
+    EXECUTE 'DROP FUNCTION IF EXISTS ' || r.func || ' CASCADE';
+  END LOOP;
+END $$;
 
 -- Update search_knowledge_embeddings function
 CREATE OR REPLACE FUNCTION search_knowledge_embeddings(
@@ -140,9 +158,9 @@ CREATE OR REPLACE FUNCTION match_agent_memories(
 )
 RETURNS TABLE (
   id uuid,
-  memory_text text,
-  tags text[],
-  context jsonb,
+  content text,
+  memory_type text,
+  metadata jsonb,
   created_at timestamptz,
   similarity float
 )
@@ -154,14 +172,15 @@ BEGIN
   RETURN QUERY
   SELECT
     am.id,
-    am.memory_text,
-    am.tags,
-    am.context,
+    am.content,
+    am.memory_type,
+    am.metadata,
     am.created_at,
     1 - (am.embedding <=> query_embedding) as similarity
   FROM agent_memories am
-  WHERE am.agent_user_id = p_user_id
+  WHERE (am.user_id = p_user_id OR am.user_id IS NULL)
     AND (p_agent_id IS NULL OR am.agent_id = p_agent_id)
+    AND (am.expires_at IS NULL OR am.expires_at > now())
     AND 1 - (am.embedding <=> query_embedding) >= match_threshold
   ORDER BY am.embedding <=> query_embedding
   LIMIT match_count;

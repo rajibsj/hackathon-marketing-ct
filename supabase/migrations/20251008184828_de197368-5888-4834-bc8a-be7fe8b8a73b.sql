@@ -108,6 +108,7 @@ ALTER TABLE public.deals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
 
 -- 1.8 Create RLS policies for contacts
+DROP POLICY IF EXISTS "Super admins can manage all contacts" ON public.contacts;
 CREATE POLICY "Super admins can manage all contacts"
   ON public.contacts
   FOR ALL
@@ -117,6 +118,7 @@ CREATE POLICY "Super admins can manage all contacts"
     AND users.role = 'super_admin'::app_role
   ));
 
+DROP POLICY IF EXISTS "Managers can view and edit contacts" ON public.contacts;
 CREATE POLICY "Managers can view and edit contacts"
   ON public.contacts
   FOR ALL
@@ -127,6 +129,7 @@ CREATE POLICY "Managers can view and edit contacts"
   ));
 
 -- 1.9 Create RLS policies for deals
+DROP POLICY IF EXISTS "Super admins can manage all deals" ON public.deals;
 CREATE POLICY "Super admins can manage all deals"
   ON public.deals
   FOR ALL
@@ -136,6 +139,7 @@ CREATE POLICY "Super admins can manage all deals"
     AND users.role = 'super_admin'::app_role
   ));
 
+DROP POLICY IF EXISTS "Managers can view and edit deals" ON public.deals;
 CREATE POLICY "Managers can view and edit deals"
   ON public.deals
   FOR ALL
@@ -146,6 +150,7 @@ CREATE POLICY "Managers can view and edit deals"
   ));
 
 -- 1.10 Create RLS policies for activities
+DROP POLICY IF EXISTS "Super admins can manage all activities" ON public.activities;
 CREATE POLICY "Super admins can manage all activities"
   ON public.activities
   FOR ALL
@@ -155,6 +160,7 @@ CREATE POLICY "Super admins can manage all activities"
     AND users.role = 'super_admin'::app_role
   ));
 
+DROP POLICY IF EXISTS "Managers can view and edit activities" ON public.activities;
 CREATE POLICY "Managers can view and edit activities"
   ON public.activities
   FOR ALL

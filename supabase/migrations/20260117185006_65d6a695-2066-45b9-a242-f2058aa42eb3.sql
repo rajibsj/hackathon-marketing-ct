@@ -1,5 +1,5 @@
 -- Create vision_examples table for storing pre-generated agent demo outputs
-CREATE TABLE public.vision_examples (
+CREATE TABLE IF NOT EXISTS public.vision_examples (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   agent_slug TEXT NOT NULL,
   agent_name TEXT NOT NULL,
@@ -16,6 +16,7 @@ CREATE TABLE public.vision_examples (
 ALTER TABLE public.vision_examples ENABLE ROW LEVEL SECURITY;
 
 -- All authenticated users can read examples
+DROP POLICY IF EXISTS "All authenticated users can view vision examples" ON public.vision_examples;
 CREATE POLICY "All authenticated users can view vision examples"
 ON public.vision_examples
 FOR SELECT
@@ -23,6 +24,7 @@ TO authenticated
 USING (true);
 
 -- Only super_admin can modify examples
+DROP POLICY IF EXISTS "Only super_admin can insert vision examples" ON public.vision_examples;
 CREATE POLICY "Only super_admin can insert vision examples"
 ON public.vision_examples
 FOR INSERT
@@ -34,6 +36,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Only super_admin can update vision examples" ON public.vision_examples;
 CREATE POLICY "Only super_admin can update vision examples"
 ON public.vision_examples
 FOR UPDATE
@@ -45,6 +48,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Only super_admin can delete vision examples" ON public.vision_examples;
 CREATE POLICY "Only super_admin can delete vision examples"
 ON public.vision_examples
 FOR DELETE
@@ -56,11 +60,12 @@ USING (
   )
 );
 
--- Create index for faster lookups
-CREATE INDEX idx_vision_examples_agent_slug ON public.vision_examples(agent_slug);
-CREATE INDEX idx_vision_examples_active ON public.vision_examples(is_active);
+-- CREATE INDEX IF NOT EXISTS for faster lookups
+CREATE INDEX IF NOT EXISTS idx_vision_examples_agent_slug ON public.vision_examples(agent_slug);
+CREATE INDEX IF NOT EXISTS idx_vision_examples_active ON public.vision_examples(is_active);
 
 -- Add trigger for updated_at
+DROP TRIGGER IF EXISTS update_vision_examples_updated_at ON public.vision_examples;
 CREATE TRIGGER update_vision_examples_updated_at
 BEFORE UPDATE ON public.vision_examples
 FOR EACH ROW

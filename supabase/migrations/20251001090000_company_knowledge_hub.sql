@@ -56,16 +56,19 @@ alter table company_knowledge_categories
 alter table knowledge_sources
   add constraint knowledge_sources_unique_name_per_category unique (category_id, name);
 
+DROP TRIGGER IF EXISTS company_knowledge_categories_updated_at ON company_knowledge_categories;
 create trigger company_knowledge_categories_updated_at
   before update on company_knowledge_categories
   for each row
   execute procedure trigger_set_timestamps();
 
+DROP TRIGGER IF EXISTS knowledge_sources_updated_at ON knowledge_sources;
 create trigger knowledge_sources_updated_at
   before update on knowledge_sources
   for each row
   execute procedure trigger_set_timestamps();
 
+DROP TRIGGER IF EXISTS knowledge_files_updated_at ON knowledge_files;
 create trigger knowledge_files_updated_at
   before update on knowledge_files
   for each row

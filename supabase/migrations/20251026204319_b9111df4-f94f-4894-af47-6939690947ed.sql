@@ -49,6 +49,7 @@ alter table public.knowledge_sources enable row level security;
 alter table public.knowledge_files enable row level security;
 
 -- RLS Policies for company_knowledge_categories
+DROP POLICY IF EXISTS "Admins can manage categories" ON public.company_knowledge_categories;
 create policy "Admins can manage categories"
 on public.company_knowledge_categories for all
 using (
@@ -61,6 +62,7 @@ with check (
 );
 
 -- RLS Policies for knowledge_sources
+DROP POLICY IF EXISTS "Admins can manage sources" ON public.knowledge_sources;
 create policy "Admins can manage sources"
 on public.knowledge_sources for all
 using (
@@ -73,6 +75,7 @@ with check (
 );
 
 -- RLS Policies for knowledge_files
+DROP POLICY IF EXISTS "Admins can manage files" ON public.knowledge_files;
 create policy "Admins can manage files"
 on public.knowledge_files for all
 using (
@@ -97,16 +100,19 @@ begin
 end;
 $$;
 
+DROP TRIGGER IF EXISTS update_company_knowledge_categories_updated_at ON public.company_knowledge_categories;
 create trigger update_company_knowledge_categories_updated_at
 before update on public.company_knowledge_categories
 for each row
 execute function public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_knowledge_sources_updated_at ON public.knowledge_sources;
 create trigger update_knowledge_sources_updated_at
 before update on public.knowledge_sources
 for each row
 execute function public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_knowledge_files_updated_at ON public.knowledge_files;
 create trigger update_knowledge_files_updated_at
 before update on public.knowledge_files
 for each row

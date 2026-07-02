@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS public.analytics_api_keys (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_analytics_api_keys_hash
+CREATE INDEX IF NOT EXISTS idx_analytics_api_keys_hash
   ON public.analytics_api_keys(key_hash) WHERE is_active = true;
 
 ALTER TABLE public.analytics_api_keys ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Super admins can view analytics API keys" ON public.analytics_api_keys;
 CREATE POLICY "Super admins can view analytics API keys"
 ON public.analytics_api_keys FOR SELECT
 TO authenticated
@@ -35,6 +36,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Super admins can insert analytics API keys" ON public.analytics_api_keys;
 CREATE POLICY "Super admins can insert analytics API keys"
 ON public.analytics_api_keys FOR INSERT
 TO authenticated
@@ -46,6 +48,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Super admins can update analytics API keys" ON public.analytics_api_keys;
 CREATE POLICY "Super admins can update analytics API keys"
 ON public.analytics_api_keys FOR UPDATE
 TO authenticated
@@ -57,6 +60,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Super admins can delete analytics API keys" ON public.analytics_api_keys;
 CREATE POLICY "Super admins can delete analytics API keys"
 ON public.analytics_api_keys FOR DELETE
 TO authenticated
@@ -77,6 +81,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_analytics_api_keys_updated_at ON public.analytics_api_keys;
 CREATE TRIGGER trigger_update_analytics_api_keys_updated_at
   BEFORE UPDATE ON public.analytics_api_keys
   FOR EACH ROW
@@ -98,7 +103,7 @@ CREATE TABLE IF NOT EXISTS public.api_rate_limits (
   CONSTRAINT unique_key_window UNIQUE (api_key_hash, window_start)
 );
 
-CREATE INDEX idx_api_rate_limits_lookup
+CREATE INDEX IF NOT EXISTS idx_api_rate_limits_lookup
   ON public.api_rate_limits(api_key_hash, window_start);
 
 -- ======================

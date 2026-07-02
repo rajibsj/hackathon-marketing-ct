@@ -80,6 +80,7 @@ DROP POLICY IF EXISTS "Admins can manage files" ON public.knowledge_files;
 DROP POLICY IF EXISTS "knowledge_files_read" ON public.knowledge_files;
 DROP POLICY IF EXISTS "knowledge_files_all" ON public.knowledge_files;
 
+DROP POLICY IF EXISTS "Knowledge files accessible by brand or role" ON public.knowledge_files;
 CREATE POLICY "Knowledge files accessible by brand or role"
   ON public.knowledge_files
   FOR SELECT
@@ -90,6 +91,7 @@ CREATE POLICY "Knowledge files accessible by brand or role"
     OR has_role(auth.uid(), 'manager'::app_role)
   );
 
+DROP POLICY IF EXISTS "Upload knowledge files within access" ON public.knowledge_files;
 CREATE POLICY "Upload knowledge files within access"
   ON public.knowledge_files
   FOR INSERT
@@ -107,6 +109,7 @@ CREATE POLICY "Upload knowledge files within access"
     OR has_role(auth.uid(), 'manager'::app_role)
   );
 
+DROP POLICY IF EXISTS "Update own knowledge files" ON public.knowledge_files;
 CREATE POLICY "Update own knowledge files"
   ON public.knowledge_files
   FOR UPDATE
@@ -129,6 +132,7 @@ CREATE POLICY "Update own knowledge files"
     )
   );
 
+DROP POLICY IF EXISTS "Delete own knowledge files" ON public.knowledge_files;
 CREATE POLICY "Delete own knowledge files"
   ON public.knowledge_files
   FOR DELETE

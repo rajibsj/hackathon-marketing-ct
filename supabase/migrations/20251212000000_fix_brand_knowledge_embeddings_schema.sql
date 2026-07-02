@@ -5,7 +5,7 @@
 DROP TABLE IF EXISTS public.brand_knowledge_embeddings CASCADE;
 
 -- Recreate brand_knowledge_embeddings with correct schema
-CREATE TABLE public.brand_knowledge_embeddings (
+CREATE TABLE IF NOT EXISTS public.brand_knowledge_embeddings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   file_id UUID NOT NULL REFERENCES public.knowledge_files(id) ON DELETE CASCADE,
   brand_id UUID NOT NULL REFERENCES public.brands(id) ON DELETE CASCADE,

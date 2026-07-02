@@ -20,9 +20,11 @@ SELECT
   true,
   'manager',
   (
-    SELECT id FROM public.users
-    WHERE role = 'super_admin'
-    ORDER BY created_at ASC
+    SELECT ur.user_id
+    FROM public.user_roles ur
+    JOIN public.users u ON u.id = ur.user_id
+    WHERE ur.role = 'super_admin'::app_role
+    ORDER BY u.created_at ASC
     LIMIT 1
   )
 WHERE NOT EXISTS (

@@ -153,6 +153,7 @@ WITH CHECK (
 
 -- Fix integration_logs INSERT policy
 DROP POLICY IF EXISTS "Service role can insert logs" ON public.integration_logs;
+DROP POLICY IF EXISTS "Authenticated users can insert logs" ON public.integration_logs;
 CREATE POLICY "Authenticated users can insert logs"
 ON public.integration_logs
 FOR INSERT
@@ -166,6 +167,7 @@ WITH CHECK (
 
 -- Fix seo_blog_generation_logs INSERT policy
 DROP POLICY IF EXISTS "Service role can insert generation logs" ON public.seo_blog_generation_logs;
+DROP POLICY IF EXISTS "Authenticated users can insert generation logs" ON public.seo_blog_generation_logs;
 CREATE POLICY "Authenticated users can insert generation logs"
 ON public.seo_blog_generation_logs
 FOR INSERT
@@ -180,6 +182,7 @@ WITH CHECK (
 DROP POLICY IF EXISTS "Service role can manage reference summaries" ON public.seo_reference_summaries;
 
 -- Create separate policies for SELECT, INSERT, UPDATE, DELETE
+DROP POLICY IF EXISTS "Users can view reference summaries" ON public.seo_reference_summaries;
 CREATE POLICY "Users can view reference summaries"
 ON public.seo_reference_summaries
 FOR SELECT
@@ -190,6 +193,7 @@ USING (
   OR auth.uid() IS NOT NULL
 );
 
+DROP POLICY IF EXISTS "Users can insert reference summaries" ON public.seo_reference_summaries;
 CREATE POLICY "Users can insert reference summaries"
 ON public.seo_reference_summaries
 FOR INSERT
@@ -200,6 +204,7 @@ WITH CHECK (
   OR auth.uid() IS NOT NULL
 );
 
+DROP POLICY IF EXISTS "Admins can update reference summaries" ON public.seo_reference_summaries;
 CREATE POLICY "Admins can update reference summaries"
 ON public.seo_reference_summaries
 FOR UPDATE
@@ -213,6 +218,7 @@ WITH CHECK (
   OR has_role(auth.uid(), 'manager')
 );
 
+DROP POLICY IF EXISTS "Admins can delete reference summaries" ON public.seo_reference_summaries;
 CREATE POLICY "Admins can delete reference summaries"
 ON public.seo_reference_summaries
 FOR DELETE

@@ -29,16 +29,19 @@ COMMENT ON TABLE public.user_activity_logs IS
 
 ALTER TABLE public.user_activity_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own activity logs" ON public.user_activity_logs;
 CREATE POLICY "Users can view own activity logs"
   ON public.user_activity_logs FOR SELECT
   TO authenticated
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own activity logs" ON public.user_activity_logs;
 CREATE POLICY "Users can insert own activity logs"
   ON public.user_activity_logs FOR INSERT
   TO authenticated
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Super admins can view all activity logs" ON public.user_activity_logs;
 CREATE POLICY "Super admins can view all activity logs"
   ON public.user_activity_logs FOR SELECT
   TO authenticated

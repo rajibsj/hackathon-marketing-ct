@@ -19,18 +19,21 @@ CREATE TABLE IF NOT EXISTS public.content_safety_reports (
 ALTER TABLE public.content_safety_reports ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own reports
+DROP POLICY IF EXISTS "Users can view their own safety reports" ON public.content_safety_reports;
 CREATE POLICY "Users can view their own safety reports"
   ON public.content_safety_reports
   FOR SELECT 
   USING (auth.uid() = user_id);
 
 -- Users can create their own reports
+DROP POLICY IF EXISTS "Users can create safety reports" ON public.content_safety_reports;
 CREATE POLICY "Users can create safety reports"
   ON public.content_safety_reports
   FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 
 -- Admins can view all reports
+DROP POLICY IF EXISTS "Admins can view all safety reports" ON public.content_safety_reports;
 CREATE POLICY "Admins can view all safety reports"
   ON public.content_safety_reports
   FOR SELECT 
@@ -40,6 +43,7 @@ CREATE POLICY "Admins can view all safety reports"
   );
 
 -- Admins can update reports
+DROP POLICY IF EXISTS "Admins can update safety reports" ON public.content_safety_reports;
 CREATE POLICY "Admins can update safety reports"
   ON public.content_safety_reports
   FOR UPDATE 

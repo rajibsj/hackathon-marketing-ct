@@ -45,14 +45,16 @@ ALTER TABLE public.brand_analytics_integrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brand_analytics_data ENABLE ROW LEVEL SECURITY;
 
 -- Allow marketing team members and admins to manage integrations, while brand collaborators can manage their own brand
+DROP POLICY IF EXISTS "Marketing team can manage brand analytics integrations" ON public.brand_analytics_integrations;
 CREATE POLICY "Marketing team can manage brand analytics integrations"
   ON public.brand_analytics_integrations
   FOR ALL
   USING (
-    EXISTS (
+    public.has_role(auth.uid(), 'super_admin'::app_role)
+    OR public.has_role(auth.uid(), 'manager'::app_role)
+    OR EXISTS (
       SELECT 1 FROM public.users
-      WHERE users.id = auth.uid()
-        AND (users.role IN ('super_admin', 'manager') OR users.is_marketing = true)
+      WHERE users.id = auth.uid() AND users.is_marketing = true
     )
     OR EXISTS (
       SELECT 1 FROM public.brands b
@@ -65,10 +67,11 @@ CREATE POLICY "Marketing team can manage brand analytics integrations"
     )
   )
   WITH CHECK (
-    EXISTS (
+    public.has_role(auth.uid(), 'super_admin'::app_role)
+    OR public.has_role(auth.uid(), 'manager'::app_role)
+    OR EXISTS (
       SELECT 1 FROM public.users
-      WHERE users.id = auth.uid()
-        AND (users.role IN ('super_admin', 'manager') OR users.is_marketing = true)
+      WHERE users.id = auth.uid() AND users.is_marketing = true
     )
     OR EXISTS (
       SELECT 1 FROM public.brands b
@@ -82,14 +85,16 @@ CREATE POLICY "Marketing team can manage brand analytics integrations"
   );
 
 -- Allow marketing team members and brand collaborators to read analytics payloads
+DROP POLICY IF EXISTS "Marketing team can view brand analytics data" ON public.brand_analytics_data;
 CREATE POLICY "Marketing team can view brand analytics data"
   ON public.brand_analytics_data
   FOR SELECT
   USING (
-    EXISTS (
+    public.has_role(auth.uid(), 'super_admin'::app_role)
+    OR public.has_role(auth.uid(), 'manager'::app_role)
+    OR EXISTS (
       SELECT 1 FROM public.users
-      WHERE users.id = auth.uid()
-        AND (users.role IN ('super_admin', 'manager') OR users.is_marketing = true)
+      WHERE users.id = auth.uid() AND users.is_marketing = true
     )
     OR EXISTS (
       SELECT 1 FROM public.brands b
@@ -103,16 +108,19 @@ CREATE POLICY "Marketing team can view brand analytics data"
   );
 
 -- Allow inserts via trusted automation through service key (handled in edge function)
+DROP POLICY IF EXISTS "Allow insert via service role" ON public.brand_analytics_data;
 CREATE POLICY "Allow insert via service role" ON public.brand_analytics_data
   FOR INSERT
   WITH CHECK (auth.role() = 'service_role');
 
 -- Keep timestamps fresh
+DROP TRIGGER IF EXISTS update_brand_analytics_integrations_updated_at ON public.brand_analytics_integrations;
 CREATE TRIGGER update_brand_analytics_integrations_updated_at
   BEFORE UPDATE ON public.brand_analytics_integrations
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_brand_analytics_data_created_at ON public.brand_analytics_data;
 CREATE TRIGGER update_brand_analytics_data_created_at
   BEFORE UPDATE ON public.brand_analytics_data
   FOR EACH ROW

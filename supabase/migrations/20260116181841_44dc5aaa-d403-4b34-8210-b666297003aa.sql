@@ -1,5 +1,5 @@
 -- Create client_testimonials table
-CREATE TABLE public.client_testimonials (
+CREATE TABLE IF NOT EXISTS public.client_testimonials (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
   brand_id UUID REFERENCES public.brands(id) ON DELETE SET NULL,
@@ -51,6 +51,7 @@ ALTER TABLE public.client_testimonials
 ALTER TABLE public.client_testimonials ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "PMs and above can view testimonials" ON public.client_testimonials;
 CREATE POLICY "PMs and above can view testimonials"
 ON public.client_testimonials
 FOR SELECT
@@ -63,6 +64,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "PMs and above can insert testimonials" ON public.client_testimonials;
 CREATE POLICY "PMs and above can insert testimonials"
 ON public.client_testimonials
 FOR INSERT
@@ -75,6 +77,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "PMs and above can update testimonials" ON public.client_testimonials;
 CREATE POLICY "PMs and above can update testimonials"
 ON public.client_testimonials
 FOR UPDATE
@@ -87,6 +90,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Managers and above can delete testimonials" ON public.client_testimonials;
 CREATE POLICY "Managers and above can delete testimonials"
 ON public.client_testimonials
 FOR DELETE
@@ -100,14 +104,14 @@ USING (
 );
 
 -- Indexes
-CREATE INDEX idx_testimonials_client ON public.client_testimonials(client_id);
-CREATE INDEX idx_testimonials_brand ON public.client_testimonials(brand_id);
-CREATE INDEX idx_testimonials_status ON public.client_testimonials(status);
-CREATE INDEX idx_testimonials_type ON public.client_testimonials(type);
-CREATE INDEX idx_testimonials_assigned ON public.client_testimonials(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_testimonials_client ON public.client_testimonials(client_id);
+CREATE INDEX IF NOT EXISTS idx_testimonials_brand ON public.client_testimonials(brand_id);
+CREATE INDEX IF NOT EXISTS idx_testimonials_status ON public.client_testimonials(status);
+CREATE INDEX IF NOT EXISTS idx_testimonials_type ON public.client_testimonials(type);
+CREATE INDEX IF NOT EXISTS idx_testimonials_assigned ON public.client_testimonials(assigned_to);
 
 -- Create testimonial submission tokens table
-CREATE TABLE public.testimonial_submission_tokens (
+CREATE TABLE IF NOT EXISTS public.testimonial_submission_tokens (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   testimonial_id UUID REFERENCES public.client_testimonials(id) ON DELETE CASCADE NOT NULL,
   token TEXT NOT NULL UNIQUE,
@@ -117,8 +121,8 @@ CREATE TABLE public.testimonial_submission_tokens (
 );
 
 -- Index for token lookup
-CREATE INDEX idx_testimonial_tokens_token ON public.testimonial_submission_tokens(token);
-CREATE INDEX idx_testimonial_tokens_expires ON public.testimonial_submission_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_testimonial_tokens_token ON public.testimonial_submission_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_testimonial_tokens_expires ON public.testimonial_submission_tokens(expires_at);
 
 -- No RLS on tokens - public access via token validation
 -- The token itself acts as the authentication
@@ -132,6 +136,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SET search_path = public;
 
+DROP TRIGGER IF EXISTS update_client_testimonials_updated_at ON public.client_testimonials;
 CREATE TRIGGER update_client_testimonials_updated_at
   BEFORE UPDATE ON public.client_testimonials
   FOR EACH ROW

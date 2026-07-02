@@ -62,6 +62,7 @@ CREATE POLICY "Authenticated users can upvote"
   TO authenticated
   WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Authenticated users can remove their upvote" ON public.feedback_upvotes;
 CREATE POLICY "Authenticated users can remove their upvote"
   ON public.feedback_upvotes FOR DELETE
   TO authenticated
@@ -72,17 +73,20 @@ DROP POLICY IF EXISTS "Users can view own feedback" ON public.feedback_reports;
 DROP POLICY IF EXISTS "Admins can view all feedback" ON public.feedback_reports;
 DROP POLICY IF EXISTS "Admins can update feedback" ON public.feedback_reports;
 
+DROP POLICY IF EXISTS "All authenticated users can view feedback" ON public.feedback_reports;
 CREATE POLICY "All authenticated users can view feedback"
   ON public.feedback_reports FOR SELECT
   TO authenticated
   USING (deleted_at IS NULL);
 
+DROP POLICY IF EXISTS "All authenticated users can update feedback" ON public.feedback_reports;
 CREATE POLICY "All authenticated users can update feedback"
   ON public.feedback_reports FOR UPDATE
   TO authenticated
   USING (deleted_at IS NULL)
   WITH CHECK (deleted_at IS NULL);
 
+DROP POLICY IF EXISTS "Only super admin can delete feedback" ON public.feedback_reports;
 CREATE POLICY "Only super admin can delete feedback"
   ON public.feedback_reports FOR DELETE
   TO authenticated
@@ -92,11 +96,13 @@ CREATE POLICY "Only super admin can delete feedback"
 DROP POLICY IF EXISTS "Users can view comments on own feedback" ON public.feedback_comments;
 DROP POLICY IF EXISTS "Users can comment on own feedback" ON public.feedback_comments;
 
+DROP POLICY IF EXISTS "All authenticated users can view comments" ON public.feedback_comments;
 CREATE POLICY "All authenticated users can view comments"
   ON public.feedback_comments FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "All authenticated users can add comments" ON public.feedback_comments;
 CREATE POLICY "All authenticated users can add comments"
   ON public.feedback_comments FOR INSERT
   TO authenticated

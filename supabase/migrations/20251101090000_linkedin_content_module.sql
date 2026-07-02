@@ -64,12 +64,13 @@ CREATE INDEX IF NOT EXISTS idx_generated_posts_leader ON public.generated_posts(
 -- Avoid duplicate trend topics per week per leader
 DO $$
 BEGIN
-  ALTER TABLE public.weekly_trends
-    ADD CONSTRAINT weekly_trends_unique_topic UNIQUE (leader_id, week_start, topic_title);
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END
-$$;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'weekly_trends_unique_topic'
+  ) THEN
+    ALTER TABLE public.weekly_trends
+      ADD CONSTRAINT weekly_trends_unique_topic UNIQUE (leader_id, week_start, topic_title);
+  END IF;
+END $$;
 
 -- Enable row level security
 ALTER TABLE public.thought_leaders ENABLE ROW LEVEL SECURITY;

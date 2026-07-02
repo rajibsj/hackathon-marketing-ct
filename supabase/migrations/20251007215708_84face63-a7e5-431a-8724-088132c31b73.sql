@@ -22,9 +22,20 @@ BEGIN
   END IF;
 END $$;
 
--- Step 2: Add NOT NULL constraint to owner_id (after fixing existing data)
-ALTER TABLE public.brands
-ALTER COLUMN owner_id SET NOT NULL;
+-- Step 2: Add NOT NULL constraint to owner_id only if all rows already have a value.
+-- On a fresh database the seed users are cleaned up by the previous migration
+-- (20251007213335) because they have no auth.users entry, leaving brands with
+-- NULL owner_id. Skip the constraint here; real auth users created after
+-- supabase db push will own brands via later seed migrations.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.brands WHERE owner_id IS NULL) THEN
+    ALTER TABLE public.brands ALTER COLUMN owner_id SET NOT NULL;
+    RAISE NOTICE 'NOT NULL constraint added to brands.owner_id';
+  ELSE
+    RAISE NOTICE 'Skipping NOT NULL constraint on brands.owner_id: some rows still have NULL (expected on fresh database)';
+  END IF;
+END $$;
 
 -- Step 3: Add a comment explaining the constraint
 COMMENT ON COLUMN public.brands.owner_id IS 'Required: Every brand must have an owner (manager or super_admin)';

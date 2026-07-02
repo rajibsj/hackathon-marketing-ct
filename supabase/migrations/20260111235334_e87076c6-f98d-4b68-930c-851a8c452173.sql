@@ -57,15 +57,21 @@ VALUES
     'Write a LinkedIn post about AI in finance, HR technology, business operations, or leadership. Focus on strategic insights with practical business impact and ROI considerations.'
   );
 
--- Link Pritesh's existing user to his thought leader record
-UPDATE public.thought_leaders 
-SET user_id = '605515ce-e6e7-402d-8dca-b2340452f63d'
-WHERE url_slug = 'pritesh-parshekar';
+-- Link Pritesh's existing user to his thought leader record (only if user exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.users WHERE id = '605515ce-e6e7-402d-8dca-b2340452f63d') THEN
+    UPDATE public.thought_leaders
+    SET user_id = '605515ce-e6e7-402d-8dca-b2340452f63d'
+    WHERE url_slug = 'pritesh-parshekar';
 
--- Assign content_creator role to Pritesh (he already exists in users table)
-INSERT INTO public.user_roles (user_id, role)
-VALUES ('605515ce-e6e7-402d-8dca-b2340452f63d', 'content_creator'::app_role)
-ON CONFLICT (user_id, role) DO NOTHING;
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES ('605515ce-e6e7-402d-8dca-b2340452f63d', 'content_creator'::app_role)
+    ON CONFLICT (user_id, role) DO NOTHING;
+  ELSE
+    RAISE NOTICE 'Skipping Pritesh user link: user 605515ce not present on this database.';
+  END IF;
+END $$;
 
 -- Create a function to auto-link thought leaders when they sign up via magic link
 CREATE OR REPLACE FUNCTION public.auto_link_thought_leader()

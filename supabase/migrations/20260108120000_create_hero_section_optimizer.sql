@@ -80,18 +80,21 @@ CREATE INDEX IF NOT EXISTS idx_hero_generations_strategy ON public.hero_section_
 ALTER TABLE public.hero_section_generations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view their own generations
+DROP POLICY IF EXISTS "Users can view their own hero section generations" ON public.hero_section_generations;
 CREATE POLICY "Users can view their own hero section generations"
   ON public.hero_section_generations
   FOR SELECT
   USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can insert their own generations
+DROP POLICY IF EXISTS "Users can create hero section generations" ON public.hero_section_generations;
 CREATE POLICY "Users can create hero section generations"
   ON public.hero_section_generations
   FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policy: Users can update their own generations
+DROP POLICY IF EXISTS "Users can update their own hero section generations" ON public.hero_section_generations;
 CREATE POLICY "Users can update their own hero section generations"
   ON public.hero_section_generations
   FOR UPDATE
@@ -99,6 +102,7 @@ CREATE POLICY "Users can update their own hero section generations"
   WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policy: Users can delete their own generations
+DROP POLICY IF EXISTS "Users can delete their own hero section generations" ON public.hero_section_generations;
 CREATE POLICY "Users can delete their own hero section generations"
   ON public.hero_section_generations
   FOR DELETE
@@ -145,6 +149,7 @@ CREATE INDEX IF NOT EXISTS idx_hero_logs_created_at ON public.hero_section_gener
 ALTER TABLE public.hero_section_generation_logs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can view logs for their own generations
+DROP POLICY IF EXISTS "Users can view their hero section generation logs" ON public.hero_section_generation_logs;
 CREATE POLICY "Users can view their hero section generation logs"
   ON public.hero_section_generation_logs
   FOR SELECT
@@ -157,6 +162,7 @@ CREATE POLICY "Users can view their hero section generation logs"
   );
 
 -- RLS Policy: Users can insert logs for their own generations
+DROP POLICY IF EXISTS "Users can create hero section generation logs" ON public.hero_section_generation_logs;
 CREATE POLICY "Users can create hero section generation logs"
   ON public.hero_section_generation_logs
   FOR INSERT

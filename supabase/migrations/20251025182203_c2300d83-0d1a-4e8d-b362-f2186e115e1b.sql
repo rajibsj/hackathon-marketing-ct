@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.organization_integrations (
 ALTER TABLE public.organization_integrations ENABLE ROW LEVEL SECURITY;
 
 -- Only super_admin can manage organization integrations
+DROP POLICY IF EXISTS "Super admins can manage organization integrations" ON public.organization_integrations;
 CREATE POLICY "Super admins can manage organization integrations"
   ON public.organization_integrations
   FOR ALL
@@ -25,11 +26,12 @@ CREATE POLICY "Super admins can manage organization integrations"
   );
 
 -- Add updated_at trigger
+DROP TRIGGER IF EXISTS set_organization_integrations_updated_at ON public.organization_integrations;
 CREATE TRIGGER set_organization_integrations_updated_at
   BEFORE UPDATE ON public.organization_integrations
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
--- Create index
-CREATE INDEX idx_organization_integrations_integration 
+-- CREATE INDEX IF NOT EXISTS
+CREATE INDEX IF NOT EXISTS idx_organization_integrations_integration 
   ON public.organization_integrations(integration);

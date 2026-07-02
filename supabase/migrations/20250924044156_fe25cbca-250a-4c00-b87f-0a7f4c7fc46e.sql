@@ -1,5 +1,5 @@
 -- Create clients table
-CREATE TABLE public.clients (
+CREATE TABLE IF NOT EXISTS public.clients (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT,
@@ -21,7 +21,7 @@ CREATE TABLE public.clients (
 );
 
 -- Create projects table
-CREATE TABLE public.projects (
+CREATE TABLE IF NOT EXISTS public.projects (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID NOT NULL,
   name TEXT NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE public.projects (
 );
 
 -- Create project tasks table
-CREATE TABLE public.project_tasks (
+CREATE TABLE IF NOT EXISTS public.project_tasks (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   project_id UUID NOT NULL,
   title TEXT NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE public.project_tasks (
 );
 
 -- Create client communications table
-CREATE TABLE public.client_communications (
+CREATE TABLE IF NOT EXISTS public.client_communications (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID NOT NULL,
   project_id UUID,
@@ -78,6 +78,7 @@ ALTER TABLE public.project_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.client_communications ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for clients
+DROP POLICY IF EXISTS "Super admins can manage all clients" ON public.clients;
 CREATE POLICY "Super admins can manage all clients" 
 ON public.clients 
 FOR ALL 
@@ -87,6 +88,7 @@ USING (EXISTS (
   AND role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Managers can view and edit clients" ON public.clients;
 CREATE POLICY "Managers can view and edit clients" 
 ON public.clients 
 FOR ALL 
@@ -96,6 +98,7 @@ USING (EXISTS (
   AND role = ANY(ARRAY['super_admin'::app_role, 'manager'::app_role])
 ));
 
+DROP POLICY IF EXISTS "PMs can view assigned clients" ON public.clients;
 CREATE POLICY "PMs can view assigned clients" 
 ON public.clients 
 FOR SELECT 
@@ -109,6 +112,7 @@ USING (
 );
 
 -- Create RLS policies for projects
+DROP POLICY IF EXISTS "Super admins can manage all projects" ON public.projects;
 CREATE POLICY "Super admins can manage all projects" 
 ON public.projects 
 FOR ALL 
@@ -118,6 +122,7 @@ USING (EXISTS (
   AND role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Managers and PMs can view and edit projects" ON public.projects;
 CREATE POLICY "Managers and PMs can view and edit projects" 
 ON public.projects 
 FOR ALL 
@@ -127,6 +132,7 @@ USING (EXISTS (
   AND role = ANY(ARRAY['super_admin'::app_role, 'manager'::app_role, 'pm'::app_role])
 ));
 
+DROP POLICY IF EXISTS "Team members can view assigned projects" ON public.projects;
 CREATE POLICY "Team members can view assigned projects" 
 ON public.projects 
 FOR SELECT 
@@ -141,6 +147,7 @@ USING (
 );
 
 -- Create RLS policies for project tasks
+DROP POLICY IF EXISTS "Super admins can manage all project tasks" ON public.project_tasks;
 CREATE POLICY "Super admins can manage all project tasks" 
 ON public.project_tasks 
 FOR ALL 
@@ -150,6 +157,7 @@ USING (EXISTS (
   AND role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Team members can view and edit their assigned tasks" ON public.project_tasks;
 CREATE POLICY "Team members can view and edit their assigned tasks" 
 ON public.project_tasks 
 FOR ALL 
@@ -168,6 +176,7 @@ USING (
 );
 
 -- Create RLS policies for client communications
+DROP POLICY IF EXISTS "Super admins can manage all communications" ON public.client_communications;
 CREATE POLICY "Super admins can manage all communications" 
 ON public.client_communications 
 FOR ALL 
@@ -177,6 +186,7 @@ USING (EXISTS (
   AND role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "Team members can view and create communications" ON public.client_communications;
 CREATE POLICY "Team members can view and create communications" 
 ON public.client_communications 
 FOR ALL 
@@ -190,28 +200,31 @@ USING (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_clients_status ON public.clients(status);
-CREATE INDEX idx_clients_assigned_manager ON public.clients(assigned_manager);
-CREATE INDEX idx_projects_client_id ON public.projects(client_id);
-CREATE INDEX idx_projects_status ON public.projects(status);
-CREATE INDEX idx_projects_project_manager ON public.projects(project_manager);
-CREATE INDEX idx_project_tasks_project_id ON public.project_tasks(project_id);
-CREATE INDEX idx_project_tasks_assigned_to ON public.project_tasks(assigned_to);
-CREATE INDEX idx_project_tasks_status ON public.project_tasks(status);
-CREATE INDEX idx_client_communications_client_id ON public.client_communications(client_id);
-CREATE INDEX idx_client_communications_project_id ON public.client_communications(project_id);
+CREATE INDEX IF NOT EXISTS idx_clients_status ON public.clients(status);
+CREATE INDEX IF NOT EXISTS idx_clients_assigned_manager ON public.clients(assigned_manager);
+CREATE INDEX IF NOT EXISTS idx_projects_client_id ON public.projects(client_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON public.projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_project_manager ON public.projects(project_manager);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_project_id ON public.project_tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_assigned_to ON public.project_tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_project_tasks_status ON public.project_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_client_communications_client_id ON public.client_communications(client_id);
+CREATE INDEX IF NOT EXISTS idx_client_communications_project_id ON public.client_communications(project_id);
 
 -- Create triggers for updated_at timestamps
+DROP TRIGGER IF EXISTS update_clients_updated_at ON public.clients;
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON public.clients
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_projects_updated_at ON public.projects;
 CREATE TRIGGER update_projects_updated_at
   BEFORE UPDATE ON public.projects
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_project_tasks_updated_at ON public.project_tasks;
 CREATE TRIGGER update_project_tasks_updated_at
   BEFORE UPDATE ON public.project_tasks
   FOR EACH ROW

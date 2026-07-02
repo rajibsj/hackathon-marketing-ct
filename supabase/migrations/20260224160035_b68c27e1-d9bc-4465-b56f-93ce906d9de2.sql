@@ -13,5 +13,7 @@ CREATE TABLE IF NOT EXISTS public.weekly_content_ideas (
   created_by UUID DEFAULT NULL
 );
 ALTER TABLE public.weekly_content_ideas ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Auth view content ideas" ON public.weekly_content_ideas;
 CREATE POLICY "Auth view content ideas" ON public.weekly_content_ideas FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Auth insert content ideas" ON public.weekly_content_ideas;
 CREATE POLICY "Auth insert content ideas" ON public.weekly_content_ideas FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS project_task_comments (
 ALTER TABLE project_task_comments ENABLE ROW LEVEL SECURITY;
 
 -- Managers and super admins can view all comments
+DROP POLICY IF EXISTS "Managers can view all task comments" ON project_task_comments;
 CREATE POLICY "Managers can view all task comments"
   ON project_task_comments
   FOR SELECT
@@ -25,6 +26,7 @@ CREATE POLICY "Managers can view all task comments"
   );
 
 -- Service role can manage comments (for sync operations)
+DROP POLICY IF EXISTS "Service role can manage task comments" ON project_task_comments;
 CREATE POLICY "Service role can manage task comments"
   ON project_task_comments
   FOR ALL
@@ -41,6 +43,6 @@ BEGIN
   END IF;
 END $$;
 
--- Create index for faster comment lookups
+-- CREATE INDEX IF NOT EXISTS for faster comment lookups
 CREATE INDEX IF NOT EXISTS idx_project_task_comments_task_id ON project_task_comments(task_id);
 CREATE INDEX IF NOT EXISTS idx_project_task_comments_activecollab_id ON project_task_comments(activecollab_comment_id);

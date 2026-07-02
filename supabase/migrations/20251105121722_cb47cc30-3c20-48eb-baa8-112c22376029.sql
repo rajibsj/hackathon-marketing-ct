@@ -10,7 +10,7 @@ ALTER TABLE project_tasks
 ADD COLUMN IF NOT EXISTS activecollab_task_id TEXT,
 ADD COLUMN IF NOT EXISTS activecollab_sync_at TIMESTAMP WITH TIME ZONE;
 
--- Create index for faster lookups
+-- CREATE INDEX IF NOT EXISTS for faster lookups
 CREATE INDEX IF NOT EXISTS idx_projects_activecollab_id ON projects(activecollab_project_id);
 CREATE INDEX IF NOT EXISTS idx_project_tasks_activecollab_id ON project_tasks(activecollab_task_id);
 
@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS activecollab_sync_logs (
 ALTER TABLE activecollab_sync_logs ENABLE ROW LEVEL SECURITY;
 
 -- Create policy for sync logs
+DROP POLICY IF EXISTS "Admins can view sync logs" ON activecollab_sync_logs;
 CREATE POLICY "Admins can view sync logs"
   ON activecollab_sync_logs
   FOR SELECT
@@ -39,6 +40,7 @@ CREATE POLICY "Admins can view sync logs"
     has_role(auth.uid(), 'pm'::app_role)
   );
 
+DROP POLICY IF EXISTS "Service role can manage sync logs" ON activecollab_sync_logs;
 CREATE POLICY "Service role can manage sync logs"
   ON activecollab_sync_logs
   FOR ALL

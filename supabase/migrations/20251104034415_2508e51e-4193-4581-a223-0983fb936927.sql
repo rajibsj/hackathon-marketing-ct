@@ -1,4 +1,5 @@
 -- Allow users to add comments to their own feedback reports
+DROP POLICY IF EXISTS "Users can comment on own feedback" ON own;
 CREATE POLICY "Users can comment on own feedback"
 ON public.feedback_comments
 FOR INSERT

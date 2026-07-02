@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS feedback_upvotes (
 -- Enable RLS on feedback_upvotes
 ALTER TABLE feedback_upvotes ENABLE ROW LEVEL SECURITY;
 
--- Create index for faster lookups
+-- CREATE INDEX IF NOT EXISTS for faster lookups
 CREATE INDEX IF NOT EXISTS idx_feedback_upvotes_feedback_id ON feedback_upvotes(feedback_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_upvotes_user_id ON feedback_upvotes(user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_reports_feedback_number ON feedback_reports(feedback_number);
@@ -53,18 +53,21 @@ DROP POLICY IF EXISTS "Admins can delete feedback" ON feedback_reports;
 
 -- Create new transparent RLS policies for feedback_reports
 -- All authenticated users can view all feedback (not deleted)
+DROP POLICY IF EXISTS "All authenticated users can view feedback" ON feedback_reports;
 CREATE POLICY "All authenticated users can view feedback"
   ON feedback_reports FOR SELECT
   TO authenticated
   USING (deleted_at IS NULL);
 
 -- All authenticated users can create feedback
+DROP POLICY IF EXISTS "All authenticated users can create feedback" ON feedback_reports;
 CREATE POLICY "All authenticated users can create feedback"
   ON feedback_reports FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
 -- All authenticated users can update feedback (status, priority, module, upvotes)
+DROP POLICY IF EXISTS "All authenticated users can update feedback" ON feedback_reports;
 CREATE POLICY "All authenticated users can update feedback"
   ON feedback_reports FOR UPDATE
   TO authenticated
@@ -72,6 +75,7 @@ CREATE POLICY "All authenticated users can update feedback"
   WITH CHECK (deleted_at IS NULL);
 
 -- Only super_admin can delete feedback
+DROP POLICY IF EXISTS "Only super admin can delete feedback" ON feedback_reports;
 CREATE POLICY "Only super admin can delete feedback"
   ON feedback_reports FOR DELETE
   TO authenticated
@@ -90,18 +94,21 @@ DROP POLICY IF EXISTS "Admins can manage comments" ON feedback_comments;
 
 -- Create new transparent RLS policies for feedback_comments
 -- All authenticated users can view all comments
+DROP POLICY IF EXISTS "All authenticated users can view comments" ON feedback_comments;
 CREATE POLICY "All authenticated users can view comments"
   ON feedback_comments FOR SELECT
   TO authenticated
   USING (true);
 
 -- All authenticated users can add comments
+DROP POLICY IF EXISTS "All authenticated users can add comments" ON feedback_comments;
 CREATE POLICY "All authenticated users can add comments"
   ON feedback_comments FOR INSERT
   TO authenticated
   WITH CHECK (user_id = auth.uid());
 
 -- Users can update their own comments
+DROP POLICY IF EXISTS "Users can update own comments" ON feedback_comments;
 CREATE POLICY "Users can update own comments"
   ON feedback_comments FOR UPDATE
   TO authenticated
@@ -109,6 +116,7 @@ CREATE POLICY "Users can update own comments"
   WITH CHECK (user_id = auth.uid());
 
 -- Super admin can delete any comment
+DROP POLICY IF EXISTS "Super admin can delete comments" ON feedback_comments;
 CREATE POLICY "Super admin can delete comments"
   ON feedback_comments FOR DELETE
   TO authenticated
@@ -122,18 +130,21 @@ CREATE POLICY "Super admin can delete comments"
 
 -- RLS policies for feedback_upvotes
 -- All authenticated users can view upvotes
+DROP POLICY IF EXISTS "All authenticated users can view upvotes" ON feedback_upvotes;
 CREATE POLICY "All authenticated users can view upvotes"
   ON feedback_upvotes FOR SELECT
   TO authenticated
   USING (true);
 
 -- Users can add their own upvotes
+DROP POLICY IF EXISTS "Users can add own upvotes" ON feedback_upvotes;
 CREATE POLICY "Users can add own upvotes"
   ON feedback_upvotes FOR INSERT
   TO authenticated
   WITH CHECK (user_id = auth.uid());
 
 -- Users can remove their own upvotes
+DROP POLICY IF EXISTS "Users can remove own upvotes" ON feedback_upvotes;
 CREATE POLICY "Users can remove own upvotes"
   ON feedback_upvotes FOR DELETE
   TO authenticated

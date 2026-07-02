@@ -1,5 +1,5 @@
 -- Create daily_head_starts table to track daily check-ins
-CREATE TABLE public.daily_head_starts (
+CREATE TABLE IF NOT EXISTS public.daily_head_starts (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -16,24 +16,28 @@ CREATE TABLE public.daily_head_starts (
 ALTER TABLE public.daily_head_starts ENABLE ROW LEVEL SECURITY;
 
 -- Users can view their own head starts
+DROP POLICY IF EXISTS "Users can view their own head starts" ON public.daily_head_starts;
 CREATE POLICY "Users can view their own head starts"
 ON public.daily_head_starts
 FOR SELECT
 USING (auth.uid() = user_id);
 
 -- Users can create their own head starts
+DROP POLICY IF EXISTS "Users can create their own head starts" ON public.daily_head_starts;
 CREATE POLICY "Users can create their own head starts"
 ON public.daily_head_starts
 FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
 -- Users can update their own head starts
+DROP POLICY IF EXISTS "Users can update their own head starts" ON public.daily_head_starts;
 CREATE POLICY "Users can update their own head starts"
 ON public.daily_head_starts
 FOR UPDATE
 USING (auth.uid() = user_id);
 
 -- Admins can view all head starts
+DROP POLICY IF EXISTS "Admins can view all head starts" ON public.daily_head_starts;
 CREATE POLICY "Admins can view all head starts"
 ON public.daily_head_starts
 FOR SELECT
@@ -46,7 +50,7 @@ USING (
 );
 
 -- Create email_notifications_log table
-CREATE TABLE public.email_notifications_log (
+CREATE TABLE IF NOT EXISTS public.email_notifications_log (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   recipient_email TEXT NOT NULL,
   recipient_user_id UUID REFERENCES public.users(id),
@@ -62,6 +66,7 @@ CREATE TABLE public.email_notifications_log (
 ALTER TABLE public.email_notifications_log ENABLE ROW LEVEL SECURITY;
 
 -- Only admins can view email logs
+DROP POLICY IF EXISTS "Admins can view email logs" ON public.email_notifications_log;
 CREATE POLICY "Admins can view email logs"
 ON public.email_notifications_log
 FOR SELECT
@@ -74,6 +79,7 @@ USING (
 );
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_daily_head_starts_updated_at ON public.daily_head_starts;
 CREATE TRIGGER update_daily_head_starts_updated_at
 BEFORE UPDATE ON public.daily_head_starts
 FOR EACH ROW

@@ -4,6 +4,7 @@ values ('knowledge', 'knowledge', false)
 on conflict (id) do nothing;
 
 -- RLS policies for knowledge bucket
+DROP POLICY IF EXISTS "Admins can upload knowledge files" ON storage;
 create policy "Admins can upload knowledge files"
 on storage.objects for insert
 to authenticated
@@ -12,6 +13,7 @@ with check (
   (has_role(auth.uid(), 'super_admin'::app_role) or has_role(auth.uid(), 'manager'::app_role))
 );
 
+DROP POLICY IF EXISTS "Admins can read knowledge files" ON storage;
 create policy "Admins can read knowledge files"
 on storage.objects for select
 to authenticated
@@ -20,6 +22,7 @@ using (
   (has_role(auth.uid(), 'super_admin'::app_role) or has_role(auth.uid(), 'manager'::app_role))
 );
 
+DROP POLICY IF EXISTS "Admins can update knowledge files" ON storage;
 create policy "Admins can update knowledge files"
 on storage.objects for update
 to authenticated
@@ -28,6 +31,7 @@ using (
   (has_role(auth.uid(), 'super_admin'::app_role) or has_role(auth.uid(), 'manager'::app_role))
 );
 
+DROP POLICY IF EXISTS "Admins can delete knowledge files" ON storage;
 create policy "Admins can delete knowledge files"
 on storage.objects for delete
 to authenticated

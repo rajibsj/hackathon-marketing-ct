@@ -1,5 +1,5 @@
 -- Phase 1.1: Create linkedin_agent_templates table
-CREATE TABLE linkedin_agent_templates (
+CREATE TABLE IF NOT EXISTS linkedin_agent_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   template_name TEXT NOT NULL UNIQUE,
   role_category TEXT NOT NULL CHECK (role_category IN ('executive', 'technical', 'marketing', 'sales', 'operations')),
@@ -17,16 +17,18 @@ CREATE TABLE linkedin_agent_templates (
   created_by UUID REFERENCES auth.users(id)
 );
 
-CREATE INDEX idx_agent_templates_active ON linkedin_agent_templates(is_active);
-CREATE INDEX idx_agent_templates_category ON linkedin_agent_templates(role_category);
+CREATE INDEX IF NOT EXISTS idx_agent_templates_active ON linkedin_agent_templates(is_active);
+CREATE INDEX IF NOT EXISTS idx_agent_templates_category ON linkedin_agent_templates(role_category);
 
 ALTER TABLE linkedin_agent_templates ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "linkedin_agent_templates_read" ON linkedin_agent_templates;
 CREATE POLICY "linkedin_agent_templates_read"
 ON linkedin_agent_templates FOR SELECT
 TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role) OR has_role(auth.uid(), 'pm'::app_role));
 
+DROP POLICY IF EXISTS "linkedin_agent_templates_manage" ON linkedin_agent_templates;
 CREATE POLICY "linkedin_agent_templates_manage"
 ON linkedin_agent_templates FOR ALL
 TO authenticated
@@ -34,7 +36,7 @@ USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'ma
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role));
 
 -- Phase 1.2: Create company_knowledge_base table
-CREATE TABLE company_knowledge_base (
+CREATE TABLE IF NOT EXISTS company_knowledge_base (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   knowledge_type TEXT NOT NULL CHECK (knowledge_type IN ('about_company', 'vision', 'services', 'goals', 'culture', 'achievements', 'team', 'clients')),
   title TEXT NOT NULL,
@@ -48,17 +50,19 @@ CREATE TABLE company_knowledge_base (
   updated_by UUID REFERENCES auth.users(id)
 );
 
-CREATE INDEX idx_knowledge_type ON company_knowledge_base(knowledge_type);
-CREATE INDEX idx_knowledge_active ON company_knowledge_base(is_active, effective_date);
-CREATE INDEX idx_knowledge_keywords ON company_knowledge_base USING gin(keywords);
+CREATE INDEX IF NOT EXISTS idx_knowledge_type ON company_knowledge_base(knowledge_type);
+CREATE INDEX IF NOT EXISTS idx_knowledge_active ON company_knowledge_base(is_active, effective_date);
+CREATE INDEX IF NOT EXISTS idx_knowledge_keywords ON company_knowledge_base USING gin(keywords);
 
 ALTER TABLE company_knowledge_base ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "knowledge_base_read" ON company_knowledge_base;
 CREATE POLICY "knowledge_base_read"
 ON company_knowledge_base FOR SELECT
 TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role) OR has_role(auth.uid(), 'pm'::app_role));
 
+DROP POLICY IF EXISTS "knowledge_base_manage" ON company_knowledge_base;
 CREATE POLICY "knowledge_base_manage"
 ON company_knowledge_base FOR ALL
 TO authenticated
@@ -72,7 +76,7 @@ ALTER TABLE thought_leaders
   ADD COLUMN style_overrides JSONB DEFAULT '{}'::jsonb,
   ADD COLUMN target_client_segments TEXT[];
 
-CREATE INDEX idx_leaders_template ON thought_leaders(agent_template_id);
+CREATE INDEX IF NOT EXISTS idx_leaders_template ON thought_leaders(agent_template_id);
 
 UPDATE thought_leaders SET personal_context = jsonb_build_object(
   'bio', guide_text,
@@ -81,7 +85,7 @@ UPDATE thought_leaders SET personal_context = jsonb_build_object(
 ) WHERE personal_context = '{}'::jsonb;
 
 -- Phase 1.4: Create influencer_style_library table
-CREATE TABLE influencer_style_library (
+CREATE TABLE IF NOT EXISTS influencer_style_library (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   influencer_name TEXT NOT NULL UNIQUE,
   platform TEXT DEFAULT 'linkedin',
@@ -94,15 +98,17 @@ CREATE TABLE influencer_style_library (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_influencer_active ON influencer_style_library(is_active);
+CREATE INDEX IF NOT EXISTS idx_influencer_active ON influencer_style_library(is_active);
 
 ALTER TABLE influencer_style_library ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "influencer_library_read" ON influencer_style_library;
 CREATE POLICY "influencer_library_read"
 ON influencer_style_library FOR SELECT
 TO authenticated
 USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role) OR has_role(auth.uid(), 'pm'::app_role));
 
+DROP POLICY IF EXISTS "influencer_library_manage" ON influencer_style_library;
 CREATE POLICY "influencer_library_manage"
 ON influencer_style_library FOR ALL
 TO authenticated
@@ -110,7 +116,7 @@ USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'ma
 WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role));
 
 -- Phase 1.5: Create content_performance_metrics table
-CREATE TABLE content_performance_metrics (
+CREATE TABLE IF NOT EXISTS content_performance_metrics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID REFERENCES generated_posts(id) ON DELETE CASCADE,
   leader_id UUID REFERENCES thought_leaders(id) ON DELETE CASCADE,
@@ -127,12 +133,13 @@ CREATE TABLE content_performance_metrics (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE INDEX idx_performance_leader ON content_performance_metrics(leader_id);
-CREATE INDEX idx_performance_date ON content_performance_metrics(posted_date);
-CREATE INDEX idx_performance_post ON content_performance_metrics(post_id);
+CREATE INDEX IF NOT EXISTS idx_performance_leader ON content_performance_metrics(leader_id);
+CREATE INDEX IF NOT EXISTS idx_performance_date ON content_performance_metrics(posted_date);
+CREATE INDEX IF NOT EXISTS idx_performance_post ON content_performance_metrics(post_id);
 
 ALTER TABLE content_performance_metrics ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "performance_metrics_access" ON content_performance_metrics;
 CREATE POLICY "performance_metrics_access"
 ON content_performance_metrics FOR ALL
 TO authenticated

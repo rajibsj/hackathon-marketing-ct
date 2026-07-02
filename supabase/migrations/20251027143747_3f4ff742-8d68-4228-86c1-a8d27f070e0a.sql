@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS ai_agent_knowledge_selection (
 );
 
 -- Add updated_at trigger
+DROP TRIGGER IF EXISTS update_ai_agent_knowledge_selection_updated_at ON ai_agent_knowledge_selection;
 CREATE TRIGGER update_ai_agent_knowledge_selection_updated_at
 BEFORE UPDATE ON ai_agent_knowledge_selection
 FOR EACH ROW
@@ -22,6 +23,7 @@ EXECUTE FUNCTION update_updated_at_column();
 ALTER TABLE ai_agent_knowledge_selection ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Admins can manage agent knowledge selections" ON ai_agent_knowledge_selection;
 CREATE POLICY "Admins can manage agent knowledge selections"
 ON ai_agent_knowledge_selection
 FOR ALL

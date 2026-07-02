@@ -50,6 +50,7 @@ ALTER TABLE public.gohighlevel_integrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gohighlevel_contacts ENABLE ROW LEVEL SECURITY;
 
 -- CollabAI policies
+DROP POLICY IF EXISTS "collabai_integrations_user_access" ON public.collabai_integrations;
 CREATE POLICY "collabai_integrations_user_access"
 ON public.collabai_integrations
 FOR ALL
@@ -58,6 +59,7 @@ USING (user_id::text = auth.uid()::text OR EXISTS (
   SELECT 1 FROM public.users WHERE id::text = auth.uid()::text AND role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "collabai_chats_user_access" ON public.collabai_chats;
 CREATE POLICY "collabai_chats_user_access"
 ON public.collabai_chats
 FOR ALL
@@ -71,6 +73,7 @@ USING (EXISTS (
 ));
 
 -- GoHighLevel policies
+DROP POLICY IF EXISTS "ghl_integrations_user_access" ON public.gohighlevel_integrations;
 CREATE POLICY "ghl_integrations_user_access"
 ON public.gohighlevel_integrations
 FOR ALL
@@ -79,6 +82,7 @@ USING (user_id::text = auth.uid()::text OR EXISTS (
   SELECT 1 FROM public.users WHERE id::text = auth.uid()::text AND role = 'super_admin'::app_role
 ));
 
+DROP POLICY IF EXISTS "ghl_contacts_user_access" ON public.gohighlevel_contacts;
 CREATE POLICY "ghl_contacts_user_access"
 ON public.gohighlevel_contacts
 FOR ALL

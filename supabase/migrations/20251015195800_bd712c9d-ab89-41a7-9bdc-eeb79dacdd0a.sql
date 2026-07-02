@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS public.n8n_workflow_configs (
 ALTER TABLE public.n8n_workflow_configs ENABLE ROW LEVEL SECURITY;
 
 -- Admins and managers can manage n8n workflows
+DROP POLICY IF EXISTS "Admins and managers can manage n8n workflows" ON public.n8n_workflow_configs;
 CREATE POLICY "Admins and managers can manage n8n workflows"
   ON public.n8n_workflow_configs
   FOR ALL
@@ -29,6 +30,7 @@ CREATE POLICY "Admins and managers can manage n8n workflows"
   );
 
 -- Trigger for updated_at
+DROP TRIGGER IF EXISTS update_n8n_workflow_configs_updated_at ON public.n8n_workflow_configs;
 CREATE TRIGGER update_n8n_workflow_configs_updated_at
   BEFORE UPDATE ON public.n8n_workflow_configs
   FOR EACH ROW

@@ -30,16 +30,31 @@ CREATE TABLE IF NOT EXISTS knowledge_embeddings (
   CONSTRAINT knowledge_embeddings_file_chunk_unique UNIQUE(file_id, chunk_index)
 );
 
+-- Align with earlier knowledge_embeddings schema (20251204120000) when table already exists
+ALTER TABLE public.knowledge_embeddings ADD COLUMN IF NOT EXISTS content TEXT;
+ALTER TABLE public.knowledge_embeddings ADD COLUMN IF NOT EXISTS content_hash TEXT;
+ALTER TABLE public.knowledge_embeddings ADD COLUMN IF NOT EXISTS indexed_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.knowledge_embeddings ADD COLUMN IF NOT EXISTS chunk_index INTEGER DEFAULT 0;
+ALTER TABLE public.knowledge_embeddings ADD COLUMN IF NOT EXISTS total_chunks INTEGER DEFAULT 1;
+
 -- Indexes for vector similarity search
-CREATE INDEX knowledge_embeddings_vector_idx
+CREATE INDEX IF NOT EXISTS knowledge_embeddings_vector_idx
   ON knowledge_embeddings
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 
 -- Indexes for filtering
-CREATE INDEX knowledge_embeddings_file_id_idx ON knowledge_embeddings(file_id);
-CREATE INDEX knowledge_embeddings_metadata_idx ON knowledge_embeddings USING GIN(metadata);
-CREATE INDEX knowledge_embeddings_indexed_at_idx ON knowledge_embeddings(indexed_at DESC);
+CREATE INDEX IF NOT EXISTS knowledge_embeddings_file_id_idx ON knowledge_embeddings(file_id);
+CREATE INDEX IF NOT EXISTS knowledge_embeddings_metadata_idx ON knowledge_embeddings USING GIN(metadata);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'knowledge_embeddings' AND column_name = 'indexed_at'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS knowledge_embeddings_indexed_at_idx ON knowledge_embeddings(indexed_at DESC);
+  END IF;
+END $$;
 
 COMMENT ON TABLE knowledge_embeddings IS 'Vector embeddings for company knowledge files';
 COMMENT ON COLUMN knowledge_embeddings.embedding IS '1536-dimensional vector from OpenAI text-embedding-3-small';
@@ -75,15 +90,23 @@ CREATE TABLE IF NOT EXISTS brand_knowledge_embeddings (
 );
 
 -- Vector search index
-CREATE INDEX brand_embeddings_vector_idx
+CREATE INDEX IF NOT EXISTS brand_embeddings_vector_idx
   ON brand_knowledge_embeddings
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 
 -- Filtering indexes
-CREATE INDEX brand_embeddings_file_id_idx ON brand_knowledge_embeddings(brand_file_id);
-CREATE INDEX brand_embeddings_metadata_idx ON brand_knowledge_embeddings USING GIN(metadata);
-CREATE INDEX brand_embeddings_indexed_at_idx ON brand_knowledge_embeddings(indexed_at DESC);
+CREATE INDEX IF NOT EXISTS brand_embeddings_file_id_idx ON brand_knowledge_embeddings(brand_file_id);
+CREATE INDEX IF NOT EXISTS brand_embeddings_metadata_idx ON brand_knowledge_embeddings USING GIN(metadata);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_embeddings' AND column_name = 'indexed_at'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS brand_embeddings_indexed_at_idx ON brand_knowledge_embeddings(indexed_at DESC);
+  END IF;
+END $$;
 
 COMMENT ON TABLE brand_knowledge_embeddings IS 'Vector embeddings for brand-specific knowledge files';
 
@@ -117,16 +140,16 @@ CREATE TABLE IF NOT EXISTS agent_memories (
 );
 
 -- Vector search index
-CREATE INDEX agent_memories_vector_idx
+CREATE INDEX IF NOT EXISTS agent_memories_vector_idx
   ON agent_memories
   USING ivfflat (embedding vector_cosine_ops)
   WITH (lists = 100);
 
 -- Filtering indexes
-CREATE INDEX agent_memories_user_idx ON agent_memories(agent_user_id);
-CREATE INDEX agent_memories_agent_idx ON agent_memories(agent_id);
-CREATE INDEX agent_memories_tags_idx ON agent_memories USING GIN(tags);
-CREATE INDEX agent_memories_created_at_idx ON agent_memories(created_at DESC);
+CREATE INDEX IF NOT EXISTS agent_memories_user_idx ON agent_memories(agent_user_id);
+CREATE INDEX IF NOT EXISTS agent_memories_agent_idx ON agent_memories(agent_id);
+CREATE INDEX IF NOT EXISTS agent_memories_tags_idx ON agent_memories USING GIN(tags);
+CREATE INDEX IF NOT EXISTS agent_memories_created_at_idx ON agent_memories(created_at DESC);
 
 COMMENT ON TABLE agent_memories IS 'Agent memories with vector embeddings, replaces Mem0';
 COMMENT ON COLUMN agent_memories.importance_score IS 'Score for future memory pruning (0.0 to 1.0)';

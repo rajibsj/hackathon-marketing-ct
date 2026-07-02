@@ -81,6 +81,7 @@ ALTER TABLE public.brand_analytics_integrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brand_analytics_data ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies using security definer functions (no recursion)
+DROP POLICY IF EXISTS "Marketing team can manage brand analytics integrations" ON public.brand_analytics_integrations;
 CREATE POLICY "Marketing team can manage brand analytics integrations"
   ON public.brand_analytics_integrations
   FOR ALL
@@ -94,6 +95,7 @@ CREATE POLICY "Marketing team can manage brand analytics integrations"
   );
 
 -- Allow marketing team members and brand collaborators to read analytics payloads
+DROP POLICY IF EXISTS "Marketing team can view brand analytics data" ON public.brand_analytics_data;
 CREATE POLICY "Marketing team can view brand analytics data"
   ON public.brand_analytics_data
   FOR SELECT
@@ -103,12 +105,14 @@ CREATE POLICY "Marketing team can view brand analytics data"
   );
 
 -- Allow inserts via service role for webhook endpoint
+DROP POLICY IF EXISTS "Allow insert via service role" ON public.brand_analytics_data;
 CREATE POLICY "Allow insert via service role"
   ON public.brand_analytics_data
   FOR INSERT
   WITH CHECK (true);
 
 -- Keep timestamps fresh (reuse existing trigger function)
+DROP TRIGGER IF EXISTS update_brand_analytics_integrations_updated_at ON public.brand_analytics_integrations;
 CREATE TRIGGER update_brand_analytics_integrations_updated_at
   BEFORE UPDATE ON public.brand_analytics_integrations
   FOR EACH ROW

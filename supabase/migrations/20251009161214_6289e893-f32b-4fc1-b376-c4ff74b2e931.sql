@@ -1,5 +1,5 @@
 -- Create collabai_agents table for local storage
-CREATE TABLE collabai_agents (
+CREATE TABLE IF NOT EXISTS collabai_agents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   integration_id UUID NOT NULL REFERENCES collabai_integrations(id) ON DELETE CASCADE,
   agent_id TEXT NOT NULL,
@@ -16,13 +16,14 @@ CREATE TABLE collabai_agents (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_collabai_agents_integration ON collabai_agents(integration_id);
-CREATE INDEX idx_collabai_agents_agent_id ON collabai_agents(agent_id);
+CREATE INDEX IF NOT EXISTS idx_collabai_agents_integration ON collabai_agents(integration_id);
+CREATE INDEX IF NOT EXISTS idx_collabai_agents_agent_id ON collabai_agents(agent_id);
 
 -- Enable RLS
 ALTER TABLE collabai_agents ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own agents" ON collabai_agents;
 CREATE POLICY "Users can view their own agents"
   ON collabai_agents FOR SELECT
   USING (
@@ -33,6 +34,7 @@ CREATE POLICY "Users can view their own agents"
     )
   );
 
+DROP POLICY IF EXISTS "Service role can manage agents" ON collabai_agents;
 CREATE POLICY "Service role can manage agents"
   ON collabai_agents FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');

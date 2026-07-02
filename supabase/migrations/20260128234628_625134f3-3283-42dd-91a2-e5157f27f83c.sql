@@ -19,7 +19,22 @@ SET processing_status = 'pending',
     last_error = NULL
 WHERE processing_status IN ('processing', 'failed');
 
--- Also reset brand knowledge files
-UPDATE brand_knowledge_files
-SET reindex_required = true
-WHERE openai_file_id IS NOT NULL;
+-- Also reset brand knowledge files when legacy OpenAI columns exist
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_files' AND column_name = 'openai_file_id'
+  ) THEN
+    UPDATE brand_knowledge_files
+    SET reindex_required = true
+    WHERE openai_file_id IS NOT NULL;
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'brand_knowledge_files' AND column_name = 'reindex_required'
+  ) THEN
+    UPDATE brand_knowledge_files
+    SET reindex_required = true
+    WHERE reindex_required IS DISTINCT FROM true;
+  END IF;
+END $$;

@@ -45,16 +45,19 @@ CREATE POLICY "Users can create feedback"
   TO authenticated
   WITH CHECK (auth.uid() = created_by);
 
+DROP POLICY IF EXISTS "Users can view own feedback" ON public.feedback_reports;
 CREATE POLICY "Users can view own feedback"
   ON public.feedback_reports FOR SELECT
   TO authenticated
   USING (auth.uid() = created_by);
 
+DROP POLICY IF EXISTS "Admins can view all feedback" ON public.feedback_reports;
 CREATE POLICY "Admins can view all feedback"
   ON public.feedback_reports FOR SELECT
   TO authenticated
   USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role));
 
+DROP POLICY IF EXISTS "Admins can update feedback" ON public.feedback_reports;
 CREATE POLICY "Admins can update feedback"
   ON public.feedback_reports FOR UPDATE
   TO authenticated
@@ -74,6 +77,7 @@ CREATE POLICY "Admins can manage comments"
   USING (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role))
   WITH CHECK (has_role(auth.uid(), 'super_admin'::app_role) OR has_role(auth.uid(), 'manager'::app_role));
 
+DROP POLICY IF EXISTS "Users can view comments on own feedback" ON own;
 CREATE POLICY "Users can view comments on own feedback"
   ON public.feedback_comments FOR SELECT
   TO authenticated
@@ -113,11 +117,13 @@ DROP POLICY IF EXISTS "Users can view own attachments" ON storage.objects;
 DROP POLICY IF EXISTS "Admins can view all feedback attachments" ON storage.objects;
 
 -- Storage RLS policies for feedback attachments
+DROP POLICY IF EXISTS "Authenticated users can upload feedback attachments" ON storage;
 CREATE POLICY "Authenticated users can upload feedback attachments"
   ON storage.objects FOR INSERT
   TO authenticated
   WITH CHECK (bucket_id = 'feedback-attachments');
 
+DROP POLICY IF EXISTS "Users can view own attachments" ON storage;
 CREATE POLICY "Users can view own attachments"
   ON storage.objects FOR SELECT
   TO authenticated
@@ -126,6 +132,7 @@ CREATE POLICY "Users can view own attachments"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "Admins can view all feedback attachments" ON storage;
 CREATE POLICY "Admins can view all feedback attachments"
   ON storage.objects FOR SELECT
   TO authenticated

@@ -14,22 +14,26 @@ CREATE TABLE IF NOT EXISTS public.user_google_tokens (
 ALTER TABLE public.user_google_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own tokens
+DROP POLICY IF EXISTS "Users can view their own Google tokens" ON public.user_google_tokens;
 CREATE POLICY "Users can view their own Google tokens"
   ON public.user_google_tokens
   FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own Google tokens" ON public.user_google_tokens;
 CREATE POLICY "Users can insert their own Google tokens"
   ON public.user_google_tokens
   FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own Google tokens" ON public.user_google_tokens;
 CREATE POLICY "Users can update their own Google tokens"
   ON public.user_google_tokens
   FOR UPDATE
   USING (auth.uid() = user_id);
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_user_google_tokens_updated_at ON public.user_google_tokens;
 CREATE TRIGGER update_user_google_tokens_updated_at
   BEFORE UPDATE ON public.user_google_tokens
   FOR EACH ROW

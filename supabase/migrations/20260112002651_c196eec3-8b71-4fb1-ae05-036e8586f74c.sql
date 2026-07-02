@@ -5,6 +5,7 @@
 -- =============================================
 
 -- Allow content creators to view trends for their own leader profile
+DROP POLICY IF EXISTS "Content creators can view own trends" ON public.weekly_trends;
 CREATE POLICY "Content creators can view own trends" 
 ON public.weekly_trends 
 FOR SELECT 
@@ -20,6 +21,7 @@ USING (
 );
 
 -- Allow marketing role to manage trends (insert, update, delete)
+DROP POLICY IF EXISTS "Marketing can insert trends" ON public.weekly_trends;
 CREATE POLICY "Marketing can insert trends" 
 ON public.weekly_trends 
 FOR INSERT 
@@ -31,6 +33,7 @@ WITH CHECK (
   OR has_role(auth.uid(), 'marketing'::app_role)
 );
 
+DROP POLICY IF EXISTS "Marketing can update trends" ON public.weekly_trends;
 CREATE POLICY "Marketing can update trends" 
 ON public.weekly_trends 
 FOR UPDATE 
@@ -42,6 +45,7 @@ USING (
   OR has_role(auth.uid(), 'marketing'::app_role)
 );
 
+DROP POLICY IF EXISTS "Marketing can delete trends" ON public.weekly_trends;
 CREATE POLICY "Marketing can delete trends" 
 ON public.weekly_trends 
 FOR DELETE 
@@ -58,6 +62,7 @@ USING (
 -- =============================================
 
 -- Content creators can delete their own uploads
+DROP POLICY IF EXISTS "Content creators can delete own uploads" ON public.leader_uploads;
 CREATE POLICY "Content creators can delete own uploads" 
 ON public.leader_uploads 
 FOR DELETE 
@@ -71,6 +76,7 @@ USING (
 );
 
 -- Content creators can update their own uploads
+DROP POLICY IF EXISTS "Content creators can update own uploads" ON public.leader_uploads;
 CREATE POLICY "Content creators can update own uploads" 
 ON public.leader_uploads 
 FOR UPDATE 
@@ -88,6 +94,7 @@ USING (
 -- =============================================
 
 -- Leaders can view blogs linked to their profile via leader_id
+DROP POLICY IF EXISTS "Leaders can view blogs by leader_id" ON public.seo_blog_content;
 CREATE POLICY "Leaders can view blogs by leader_id" 
 ON public.seo_blog_content 
 FOR SELECT 
@@ -99,6 +106,7 @@ USING (
 );
 
 -- Leaders can update blogs linked to their profile
+DROP POLICY IF EXISTS "Leaders can update blogs by leader_id" ON public.seo_blog_content;
 CREATE POLICY "Leaders can update blogs by leader_id" 
 ON public.seo_blog_content 
 FOR UPDATE 
@@ -110,6 +118,7 @@ USING (
 );
 
 -- Marketing can manage all blog content
+DROP POLICY IF EXISTS "Marketing can manage blogs" ON public.seo_blog_content;
 CREATE POLICY "Marketing can manage blogs" 
 ON public.seo_blog_content 
 FOR ALL 

@@ -46,20 +46,22 @@ CREATE TABLE IF NOT EXISTS public.ai_agent_knowledge_selection (
 
 ALTER TABLE public.ai_agent_knowledge_selection ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view agent knowledge selections" ON public.ai_agent_knowledge_selection;
 CREATE POLICY "Users can view agent knowledge selections"
   ON public.ai_agent_knowledge_selection FOR SELECT
   USING (
-    has_role(auth.uid(), 'super_admin'::text)
-    OR has_role(auth.uid(), 'manager'::text)
+    has_role(auth.uid(), 'super_admin'::app_role)
+    OR has_role(auth.uid(), 'manager'::app_role)
   );
 
+DROP POLICY IF EXISTS "Admins can manage agent knowledge selections" ON public.ai_agent_knowledge_selection;
 CREATE POLICY "Admins can manage agent knowledge selections"
   ON public.ai_agent_knowledge_selection FOR ALL
   USING (
-    has_role(auth.uid(), 'super_admin'::text)
-    OR has_role(auth.uid(), 'manager'::text)
+    has_role(auth.uid(), 'super_admin'::app_role)
+    OR has_role(auth.uid(), 'manager'::app_role)
   )
   WITH CHECK (
-    has_role(auth.uid(), 'super_admin'::text)
-    OR has_role(auth.uid(), 'manager'::text)
+    has_role(auth.uid(), 'super_admin'::app_role)
+    OR has_role(auth.uid(), 'manager'::app_role)
   );

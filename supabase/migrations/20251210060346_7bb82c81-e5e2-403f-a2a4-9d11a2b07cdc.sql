@@ -2,6 +2,7 @@
 ALTER TABLE public.knowledge_embeddings ENABLE ROW LEVEL SECURITY;
 
 -- Add RLS policies for knowledge_embeddings
+DROP POLICY IF EXISTS "Admins can manage knowledge embeddings" ON public.knowledge_embeddings;
 CREATE POLICY "Admins can manage knowledge embeddings" ON public.knowledge_embeddings
   FOR ALL USING (
     has_role(auth.uid(), 'super_admin'::app_role) 

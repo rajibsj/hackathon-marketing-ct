@@ -25,6 +25,7 @@ AS $$
 $$;
 
 -- Create RLS policy to allow regular users to view their assigned brands
+DROP POLICY IF EXISTS "Users can view their assigned brands" ON public.brands;
 CREATE POLICY "Users can view their assigned brands"
 ON public.brands
 FOR SELECT

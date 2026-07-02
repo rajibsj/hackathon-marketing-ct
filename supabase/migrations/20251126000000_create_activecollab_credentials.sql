@@ -18,27 +18,31 @@ CREATE TABLE IF NOT EXISTS public.activecollab_credentials (
 ALTER TABLE public.activecollab_credentials ENABLE ROW LEVEL SECURITY;
 
 -- Create policies - only super admins can access
+DROP POLICY IF EXISTS "Super admins can view activecollab credentials" ON public.activecollab_credentials;
 CREATE POLICY "Super admins can view activecollab credentials"
   ON public.activecollab_credentials
   FOR SELECT
   USING (public.has_role(auth.uid(), 'super_admin'));
 
+DROP POLICY IF EXISTS "Super admins can insert activecollab credentials" ON public.activecollab_credentials;
 CREATE POLICY "Super admins can insert activecollab credentials"
   ON public.activecollab_credentials
   FOR INSERT
   WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
 
+DROP POLICY IF EXISTS "Super admins can update activecollab credentials" ON public.activecollab_credentials;
 CREATE POLICY "Super admins can update activecollab credentials"
   ON public.activecollab_credentials
   FOR UPDATE
   USING (public.has_role(auth.uid(), 'super_admin'));
 
+DROP POLICY IF EXISTS "Super admins can delete activecollab credentials" ON public.activecollab_credentials;
 CREATE POLICY "Super admins can delete activecollab credentials"
   ON public.activecollab_credentials
   FOR DELETE
   USING (public.has_role(auth.uid(), 'super_admin'));
 
--- Create index for faster lookups
+-- CREATE INDEX IF NOT EXISTS for faster lookups
 CREATE INDEX IF NOT EXISTS idx_activecollab_credentials_active
   ON public.activecollab_credentials(is_active);
 
@@ -51,6 +55,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS update_activecollab_credentials_updated_at ON public.activecollab_credentials;
 CREATE TRIGGER update_activecollab_credentials_updated_at
   BEFORE UPDATE ON public.activecollab_credentials
   FOR EACH ROW

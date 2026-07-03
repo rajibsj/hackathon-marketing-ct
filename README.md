@@ -95,7 +95,124 @@ supabase functions serve client-health-copilot
 
 ## AI Client Retention Copilot
 
-Monitors client health using **delivery signals** from ActiveCollab and Control Tower, plus project-mapped meeting transcripts. Produces churn risk scores, project-wise concerns, and recovery task recommendations.
+Monitors client health using **delivery signals** from ActiveCollab and Control Tower, plus project-mapped meeting transcripts. Produces churn risk scores, **project-wise** concerns, and recovery task recommendations.
+
+### Analysis logic (how scoring works)
+
+When you click **Analyze Portfolio** (or **Run Analysis** for one client), the `client-health-copilot` edge function runs this pipeline:
+
+```
+1. Collect signals (per client)
+2. Build project_breakdown (per project)
+3. Compute heuristic health score (rule-based)
+4. Send signals JSON to Gemini AI
+5. Merge AI output + heuristics → risk band
+6. Save snapshot to client_health_snapshots
+```
+
+#### Step 1 — Signal collection (`collectSignals`)
+
+Loads data for **all clients** (any status: active, inactive, prospect, archived):
+
+| Signal | Source table / field | Logic |
+|--------|----------------------|-------|
+| Client profile | `clients` | name, company, status, satisfaction_score, revenue |
+| Projects | `projects` | All projects where `client_id` matches |
+| Tasks | `project_tasks` | Open tasks per project; tagged `activecollab` if `activecollab_task_id` set, else `control_tower` |
+| Overdue tasks | `project_tasks.due_date` | Open tasks with `due_date` in the past |
+| Approaching deadlines | `project_tasks.due_date` | Open tasks due within **7 days** |
+| Stale tasks | `project_tasks.updated_at` | Open tasks with no update in **14+ days** |
+| Task comments | `project_task_comments` | Recent comments; scanned for negative keywords |
+| Mapped meetings | `project_meetings` | Project-linked Zoom/CT meetings (transcript excerpt) |
+| Retention meetings | `projects.retention_meeting_transcripts` | JSONB array from project **Meetings** tab |
+| Meeting signal text | `projects.retention_meeting_signal_text` | Generated consolidated transcript text |
+| Concern keywords | `retention_meeting_transcripts[].concern_keywords` | Pre-scanned on save (disappointed, sue, overdue, etc.) |
+
+#### Step 2 — Project-wise breakdown (`buildProjectBreakdown`)
+
+For **each project** under the client, builds a `concerns[]` list:
+
+| Concern type | Trigger |
+|--------------|---------|
+| Overdue delivery | 1+ open tasks past due date |
+| Approaching deadlines | 1+ tasks due within 7 days |
+| Stale work | 1+ open tasks unchanged 14+ days |
+| Negative comment | Task comment contains negative keyword |
+| Meeting transcript keywords | Saved `concern_keywords` on project meetings |
+| Missing meetings | Active project with no meeting transcripts |
+
+Each project entry also includes: `meeting_concern_keywords`, `meeting_concern_count`, overdue/approaching task lists, and recent comments.
+
+#### Step 3 — Heuristic score (before AI)
+
+Starts from `client.satisfaction_score` (default 85), then applies penalties:
+
+| Penalty | Max deduction |
+|---------|----------------|
+| Overdue tasks | −5 per task (cap −25) |
+| Stale tasks | −10 per task (cap −20) |
+| No client meeting 21+ days | −15 |
+| Negative task comments | −5 per flag (cap −15) |
+| Meeting negative flags | −5 per flag (cap −15) |
+| Meeting concern keywords | −4 per keyword (cap −20) |
+| 3+ approaching deadlines | −5 |
+
+#### Step 4 — AI analysis (Gemini)
+
+The aggregated `signals` JSON (including full `project_breakdown`) is sent to **Gemini** with a structured prompt. The AI returns:
+
+- `health_score` (0–100)
+- `churn_probability` (0.0–1.0)
+- `risk_band` — healthy / stable / watch / critical / immediate
+- `headline`, `explanation`
+- `root_causes[]` — with evidence per project
+- `recovery_plan[]` — prioritized actions with owner hints
+- `recommended_actions[]` — create task or draft email
+
+AI is instructed to use **project_breakdown** for project-specific concerns and to weight meeting transcript keywords heavily.
+
+#### Step 5 — Risk bands
+
+| Band | Health score | Churn probability |
+|------|--------------|-------------------|
+| Healthy | 85–100 | < 15% |
+| Stable | 70–84 | 15–35% |
+| Watch | 50–69 | 35–60% |
+| Critical | 30–49 | 60–80% |
+| Immediate | 0–29 | > 80% |
+
+#### Step 6 — Persistence
+
+Results saved to `client_health_snapshots` and client fields updated (`health_score`, `churn_risk_band`, `last_health_analysis_at`). Portfolio UI reads latest snapshot per client.
+
+### Data sources (included vs excluded)
+
+#### Included
+
+| Source | DB location | Used for |
+|--------|-------------|----------|
+| ActiveCollab tasks | `project_tasks` (`activecollab_task_id`) | Overdue, stale, approaching deadlines |
+| Control Tower tasks | `project_tasks` (no AC id) | Same delivery signals |
+| Task comments | `project_task_comments` | Negative sentiment flags |
+| Project deadlines | `projects.deadline` | Delivery timeline |
+| Task due dates | `project_tasks.due_date` | Overdue / approaching logic |
+| Meeting transcripts | `projects.retention_meeting_transcripts` | Concern keyword scan + AI context |
+| Meeting signal text | `projects.retention_meeting_signal_text` | AI narrative input |
+| Project-mapped meetings | `project_meetings` | Transcript excerpts |
+
+#### Excluded (by design)
+
+HubSpot CRM fields, Google Analytics, Search Console, Slack, Microsoft Teams, invoice/billing data, and `client_communications` are **not** used for retention scoring.
+
+### Meeting concern keyword scan
+
+On the project **Meetings** tab, transcript links or pasted text are scanned automatically for:
+
+`disappointed`, `frustrated`, `overdue`, `missed deadline`, `sue`, `complaint`, `cancel`, `refund`, `escalate`, and related phrases.
+
+Results stored per meeting: `concern_keywords`, `concern_flags`, `concern_hits`, `has_client_concerns`. These roll up into **project-wise** concerns on the next portfolio analysis.
+
+Edge function: `meeting-transcript-scan` (fetches link content when possible).
 
 ### Routes (PM+)
 
@@ -106,18 +223,6 @@ Monitors client health using **delivery signals** from ActiveCollab and Control 
 | `/clients/:slug` | Client detail — **Retention Portfolio** and **Run Analysis** buttons |
 | `/projects/:slug` | Project detail — **Client & Portfolio** panel |
 | `/projects/:slug/details` | Imported/ActiveCollab project — meetings tab + client portfolio panel |
-
-### Data sources (what the copilot uses)
-
-| Source | Where it comes from |
-|--------|---------------------|
-| ActiveCollab tasks | `project_tasks` linked via `activecollab_task_id` |
-| Control Tower tasks | `project_tasks` from Control Tower sync |
-| Task comments | `project_task_comments` |
-| Deadlines | Project `deadline` and task `due_date` |
-| Meeting transcripts | Project **Meetings** tab → retention meeting links/dates/text |
-
-**Not used:** HubSpot, Google Analytics, Search Console, Slack, Teams, invoice data.
 
 ### Typical workflow
 
@@ -146,8 +251,11 @@ Monitors client health using **delivery signals** from ActiveCollab and Control 
 
 ## Documentation
 
-Detailed architecture, database schema, and SOPs live in [`.agent/README.md`](./.agent/README.md).
-
-Feature-specific guide: [`.agent/System/features/client-retention-copilot.md`](./.agent/System/features/client-retention-copilot.md).
+| Document | Audience | Path |
+|----------|----------|------|
+| **Business overview** | PMs, executives, onboarding | [`.agent/System/marketing-control-tower-business-overview.md`](./.agent/System/marketing-control-tower-business-overview.md) |
+| **Architecture** | Engineers, architects | [`.agent/System/marketing-control-tower-architecture.md`](./.agent/System/marketing-control-tower-architecture.md) |
+| **Full doc index** | Everyone | [`.agent/README.md`](./.agent/README.md) |
+| **Retention Copilot (technical)** | Engineers | [`.agent/System/features/client-retention-copilot.md`](./.agent/System/features/client-retention-copilot.md) |
 
 Project-level AI assistant instructions: [`CLAUDE.md`](./CLAUDE.md).

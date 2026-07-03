@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { isRecoveryTask, reanalyzeClientPortfolio } from '@/hooks/useClientHealth';
 
 // Task categories
 export const TASK_CATEGORIES = [
@@ -267,7 +268,7 @@ export const useUpdateProjectTask = () => {
 
       return { previousTask, id };
     },
-    onSuccess: () => {
+    onSuccess: async (_data, variables, _context) => {
       // Invalidate all task-related queries to ensure UI updates immediately
       queryClient.invalidateQueries({ queryKey: ['project-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-project-tasks'] });
@@ -277,6 +278,35 @@ export const useUpdateProjectTask = () => {
       queryClient.invalidateQueries({ queryKey: ['my-tasks-stats'] }); // Invalidate task stats
       queryClient.invalidateQueries({ queryKey: ['recovery-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['recovery-tasks-summary'] });
+
+      if (variables.updates.status === 'completed') {
+        const task = queryClient.getQueryData(['project-task', variables.id]) as {
+          title?: string;
+          description?: string | null;
+          client_id?: string | null;
+        } | undefined;
+
+        if (task && isRecoveryTask(task) && task.client_id) {
+          try {
+            await reanalyzeClientPortfolio(task.client_id);
+            queryClient.invalidateQueries({ queryKey: ['client-health-snapshots'] });
+            toast({
+              title: "Recovery task complete",
+              description: "Client portfolio score re-analyzed.",
+            });
+            return;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : "Re-analysis failed";
+            toast({
+              title: "Task updated",
+              description: `Task completed, but re-analysis failed: ${message}`,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      }
+
       toast({
         title: "Task updated",
         description: "Project task has been updated successfully.",

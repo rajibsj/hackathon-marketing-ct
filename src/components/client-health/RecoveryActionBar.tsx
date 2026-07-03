@@ -2,17 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { RecommendedAction, useCreateRecoveryTasks } from "@/hooks/useClientHealth";
+import { RecommendedAction } from "@/hooks/useClientHealth";
+import { RecoveryTaskBatchCreateDialog } from "./RecoveryTaskBatchCreateDialog";
 import { Loader2, ListTodo, Mail } from "lucide-react";
 
 interface RecoveryActionBarProps {
@@ -22,14 +13,13 @@ interface RecoveryActionBarProps {
 }
 
 export function RecoveryActionBar({ clientId, actions, projectId }: RecoveryActionBarProps) {
-  const createTasks = useCreateRecoveryTasks();
   const taskActions = actions.filter((a) => a.type === "create_task");
   const emailActions = actions.filter((a) => a.type === "draft_email");
 
   const [selectedIndices, setSelectedIndices] = useState<number[]>(
     taskActions.map((_, i) => i),
   );
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const toggleTask = (index: number) => {
     setSelectedIndices((prev) =>
@@ -37,15 +27,7 @@ export function RecoveryActionBar({ clientId, actions, projectId }: RecoveryActi
     );
   };
 
-  const handleCreateTasks = async () => {
-    const selected = selectedIndices.map((i) => taskActions[i]);
-    await createTasks.mutateAsync({
-      clientId,
-      actions: selected,
-      projectId,
-    });
-    setConfirmOpen(false);
-  };
+  const selectedActions = selectedIndices.map((i) => taskActions[i]);
 
   return (
     <div className="space-y-4">
@@ -78,16 +60,12 @@ export function RecoveryActionBar({ clientId, actions, projectId }: RecoveryActi
             </div>
           ))}
           <Button
-            onClick={() => setConfirmOpen(true)}
-            disabled={selectedIndices.length === 0 || createTasks.isPending}
+            onClick={() => setCreateOpen(true)}
+            disabled={selectedIndices.length === 0}
             className="w-full"
           >
-            {createTasks.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <ListTodo className="h-4 w-4 mr-2" />
-            )}
-            Create {selectedIndices.length} Recovery Task{selectedIndices.length === 1 ? "" : "s"}
+            <ListTodo className="h-4 w-4 mr-2" />
+            Create {selectedIndices.length} Recovery Task{selectedIndices.length === 1 ? "" : "s"}…
           </Button>
         </div>
       )}
@@ -105,23 +83,13 @@ export function RecoveryActionBar({ clientId, actions, projectId }: RecoveryActi
         </div>
       ))}
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Create recovery tasks?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will create {selectedIndices.length} task{selectedIndices.length === 1 ? "" : "s"} in the
-              client&apos;s project. You can review and assign them after creation.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCreateTasks} disabled={createTasks.isPending}>
-              {createTasks.isPending ? "Creating..." : "Create Tasks"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <RecoveryTaskBatchCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        clientId={clientId}
+        projectId={projectId}
+        actions={selectedActions}
+      />
     </div>
   );
 }

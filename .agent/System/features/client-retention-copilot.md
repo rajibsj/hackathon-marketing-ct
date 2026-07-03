@@ -9,9 +9,123 @@ AI-powered client health monitoring for PMs and account leads. Aggregates delive
 
 ## Overview
 
-The Retention Copilot answers: *Is this client at risk, why, and what should we do next?*
+The Retention Copilot answers: *Is this client at risk, why, on which projects, and what should we do next?*
 
 It analyzes **all clients** in the portfolio (not only `active` status). Concerns are grouped **project-by-project** via `project_breakdown` in the edge function response.
+
+---
+
+## Analysis pipeline
+
+```
+User clicks Analyze Portfolio
+        │
+        ▼
+┌───────────────────┐
+│  collectSignals   │  Load clients, projects, tasks, comments, meetings
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ buildProject      │  Per-project: overdue, stale, comments, meeting keywords
+│ Breakdown         │  → concerns[], meeting_concern_keywords[]
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Heuristic score   │  Rule-based penalties (overdue, stale, keywords, etc.)
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Gemini AI         │  Structured churn analysis + recovery plan
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ client_health_    │  Persist snapshot; update client health fields
+│ snapshots         │
+└───────────────────┘
+```
+
+---
+
+## Data sources
+
+### Included
+
+| Signal | Tables / fields | Analysis use |
+|--------|-----------------|--------------|
+| ActiveCollab tasks | `project_tasks` where `activecollab_task_id` is set | Overdue, stale, approaching; tagged `source: "activecollab"` |
+| Control Tower tasks | `project_tasks` from CT sync | Same; tagged `source: "control_tower"` |
+| Task comments | `project_task_comments` | Negative keyword scan on comment text |
+| Deadlines | `projects.deadline`, `project_tasks.due_date` | Overdue = past due; approaching = within 7 days |
+| Stale tasks | `project_tasks.updated_at` | No update in 14+ days while still open |
+| Retention meetings | `projects.retention_meeting_transcripts` (JSONB) | `concern_keywords`, `concern_flags`, transcript text |
+| Meeting signal text | `projects.retention_meeting_signal_text` | Consolidated text for AI prompt |
+| Project meetings | `project_meetings` | Mapped Zoom/CT meeting transcript excerpts |
+
+### Excluded (by design)
+
+- HubSpot CRM fields
+- Google Analytics / Search Console
+- Slack / Microsoft Teams
+- `client_communications` table (legacy seed may exist; not read by copilot)
+- Invoice / billing data
+
+---
+
+## Heuristic scoring rules
+
+Starting score: `clients.satisfaction_score` (default 85).
+
+| Condition | Penalty (capped) |
+|-----------|------------------|
+| Each overdue open task | −5 (max −25) |
+| Each stale open task | −10 (max −20) |
+| No meeting in 21+ days | −15 |
+| Negative comment flags | −5 each (max −15) |
+| Meeting negative flags | −5 each (max −15) |
+| Meeting concern keywords | −4 each (max −20) |
+| 3+ tasks due within 7 days | −5 |
+
+Final score clamped to 0–100. Fed to AI alongside raw signals.
+
+---
+
+## Project-wise concerns logic
+
+For each project in `project_breakdown`:
+
+1. Count open / overdue / approaching / stale tasks
+2. Scan task comments for negative keywords (`disappointed`, `frustrated`, `complaint`, etc.)
+3. Aggregate meeting `concern_keywords` from `retention_meeting_transcripts`
+4. Build `concerns[]` strings, e.g.:
+   - `"2 overdue task(s) — e.g. \"SSO enrollment handoff\""`
+   - `"Meeting transcript concern keywords: disappointed, frustrated, overdue, sue"`
+5. Expose `meeting_concern_keywords[]` and `meeting_concern_count` for UI badges
+
+---
+
+## Meeting keyword scan
+
+**Frontend:** `ProjectRetentionMeetings` auto-scans on link/text change  
+**Edge function:** `meeting-transcript-scan` fetches URL content (max 200KB)  
+**Shared logic:** `meetingConcernScan.ts` / `_shared/meeting-concern-scan.ts`
+
+Tracked phrases include: `disappointing`, `frustrated`, `overdue`, `missed deadline`, `sue`, `lawsuit`, `complaint`, `cancel`, `refund`, `escalate`, and more.
+
+Stored on each meeting row in JSONB; consumed on next **Analyze Portfolio** run.
+
+---
+
+## AI output structure
+
+Gemini returns JSON with:
+
+- `health_score`, `churn_probability`, `churn_window_days`, `risk_band`
+- `headline`, `explanation`
+- `root_causes[]` — per project where possible
+- `recovery_plan[]` — prioritized actions
+- `recommended_actions[]` — `create_task` or `draft_email`
+
+Risk bands: `healthy` | `stable` | `watch` | `critical` | `immediate`
 
 ---
 
@@ -44,28 +158,6 @@ It analyzes **all clients** in the portfolio (not only `active` status). Concern
 - **Path:** `src/hooks/useClientHealth.ts`
 - **Query key:** `client-health-snapshots`
 - **Mutations:** `analyzePortfolio(clientId?)` invokes the edge function
-
----
-
-## Data sources
-
-### Included
-
-| Signal | Tables / fields | Notes |
-|--------|-----------------|-------|
-| ActiveCollab tasks | `project_tasks` where `activecollab_task_id` is set | Tagged `source: "activecollab"` |
-| Control Tower tasks | `project_tasks` from CT sync | Tagged `source: "control_tower"` |
-| Comments | `project_task_comments` | Stale threads, negative keywords |
-| Deadlines | `projects.deadline`, `project_tasks.due_date` | Overdue and approaching |
-| Meetings | `projects.retention_meeting_transcripts`, `retention_meeting_signal_text` | Project-mapped only |
-
-### Excluded (by design)
-
-- HubSpot CRM fields
-- Google Analytics / Search Console
-- Slack / Microsoft Teams
-- `client_communications` table (legacy seed may exist; not read by copilot)
-- Invoice / billing data
 
 ---
 

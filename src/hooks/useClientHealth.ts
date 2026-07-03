@@ -47,8 +47,19 @@ export function formatRecoveryTitle(title: string) {
   return `${RECOVERY_TITLE_PREFIX} ${trimmed}`;
 }
 
-export function buildRecoveryDescription(description?: string) {
-  const base = description?.trim() || "AI-generated recovery action";
+export function buildRecoveryDescription(description?: string, concernText?: string) {
+  const parts: string[] = [];
+  const concern = concernText?.trim();
+  if (concern) {
+    parts.push(`Concern: ${concern}`);
+  }
+  const details = description?.trim();
+  if (details && details !== concern) {
+    parts.push(details);
+  } else if (!concern && details) {
+    parts.push(details);
+  }
+  const base = parts.join("\n\n") || "AI-generated recovery action";
   if (base.includes(RECOVERY_TASK_SOURCE)) return base;
   return `${base}\n\n---\nSource: ${RECOVERY_TASK_SOURCE}`;
 }
@@ -172,24 +183,52 @@ export function useRecoveryTaskSummary() {
   };
 }
 
+export async function reanalyzeClientPortfolio(clientId: string) {
+  const { data, error } = await supabase.functions.invoke("client-health-copilot", {
+    body: { client_id: clientId },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
 export function useCompleteRecoveryTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (taskId: string) => {
+    mutationFn: async ({
+      taskId,
+      clientId,
+    }: {
+      taskId: string;
+      clientId?: string | null;
+    }) => {
       const { data, error } = await (supabase as any).rpc("update_project_task", {
         p_task_id: taskId,
         p_updates: { status: "completed", completed_at: new Date().toISOString() },
       });
       if (error) throw error;
-      return data;
+      return { data, clientId };
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
+      const clientId = result.clientId;
       queryClient.invalidateQueries({ queryKey: ["recovery-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["recovery-tasks-summary"] });
       queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["all-project-tasks"] });
-      toast.success("Recovery task marked complete");
+
+      if (clientId) {
+        try {
+          await reanalyzeClientPortfolio(clientId);
+          queryClient.invalidateQueries({ queryKey: ["client-health-snapshots"] });
+          toast.success("Recovery task complete — client score re-analyzed");
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Re-analysis failed";
+          toast.warning(`Task completed, but re-analysis failed: ${message}`);
+        }
+      } else {
+        toast.success("Recovery task marked complete");
+      }
     },
     onError: (err: Error) => {
       toast.error(err.message || "Failed to complete recovery task");
@@ -542,12 +581,14 @@ export function useCreateManualRecoveryTask() {
       clientId,
       title,
       description,
+      concernText,
       projectId,
       priority = "high",
     }: {
       clientId: string;
       title: string;
       description?: string;
+      concernText?: string;
       projectId?: string | null;
       priority?: "low" | "medium" | "high" | "urgent";
     }) => {
@@ -564,7 +605,7 @@ export function useCreateManualRecoveryTask() {
           client_id: clientId,
           project_id: targetProjectId || undefined,
           title: formatRecoveryTitle(trimmedTitle),
-          description: buildRecoveryDescription(description),
+          description: buildRecoveryDescription(description, concernText),
           priority,
           status: "todo" as const,
           category: "clients" as const,

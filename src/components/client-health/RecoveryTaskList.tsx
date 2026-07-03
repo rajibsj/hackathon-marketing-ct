@@ -148,7 +148,12 @@ export function RecoveryTaskList({
                       size="sm"
                       className={cn(compact && "h-7 px-2 text-xs")}
                       disabled={completeTask.isPending}
-                      onClick={() => completeTask.mutate(task.id)}
+                      onClick={() =>
+                        completeTask.mutate({
+                          taskId: task.id,
+                          clientId: task.client_id ?? clientId ?? null,
+                        })
+                      }
                     >
                       <CheckCircle2 className={cn("h-3.5 w-3.5", !compact && "mr-1")} />
                       {!compact && "Complete"}

@@ -1,5 +1,11 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, FolderKanban, MessageSquareQuote } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, FolderKanban, ListTodo, MessageSquareQuote } from "lucide-react";
+import {
+  RecoveryTaskCreateDialog,
+  suggestRecoveryTitleFromConcern,
+} from "./RecoveryTaskCreateDialog";
 
 export interface ProjectBreakdown {
   project_id: string;
@@ -40,14 +46,38 @@ export function countMeetingConcernKeywords(projects: ProjectBreakdown[]): numbe
 
 interface ClientProjectConcernsProps {
   signals: Record<string, unknown>;
+  clientId?: string;
 }
 
-export function ClientProjectConcerns({ signals }: ClientProjectConcernsProps) {
+export function ClientProjectConcerns({ signals, clientId }: ClientProjectConcernsProps) {
   const projects = parseProjectBreakdown(signals);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogDefaults, setDialogDefaults] = useState<{
+    title: string;
+    description?: string;
+    projectId?: string | null;
+    contextLabel?: string;
+  } | null>(null);
+
   if (projects.length === 0) return null;
 
   const withConcerns = projects.filter((p) => (p.concerns?.length ?? 0) > 0);
   const meetingKeywordTotal = countMeetingConcernKeywords(projects);
+
+  const openConcernDialog = (
+    concern: string,
+    project: ProjectBreakdown,
+  ) => {
+    const projectId = project.project_id !== "unassigned" ? project.project_id : null;
+    setDialogDefaults({
+      title: suggestRecoveryTitleFromConcern(concern, project.project_name),
+      description: concern,
+      concernText: concern,
+      projectId,
+      contextLabel: project.project_name,
+    });
+    setDialogOpen(true);
+  };
 
   return (
     <div>
@@ -111,11 +141,25 @@ export function ClientProjectConcerns({ signals }: ClientProjectConcernsProps) {
             )}
 
             {(project.concerns?.length ?? 0) > 0 ? (
-              <ul className="space-y-1">
+              <ul className="space-y-2">
                 {project.concerns!.map((concern, i) => (
-                  <li key={i} className="flex items-start gap-2 text-muted-foreground">
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
-                    <span>{concern}</span>
+                  <li key={i} className="rounded-md border border-border/60 p-2 space-y-2">
+                    <div className="flex items-start gap-2 text-muted-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                      <span className="flex-1">{concern}</span>
+                    </div>
+                    {clientId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => openConcernDialog(concern, project)}
+                      >
+                        <ListTodo className="h-3 w-3 mr-1.5" />
+                        Create recovery task
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -129,6 +173,15 @@ export function ClientProjectConcerns({ signals }: ClientProjectConcernsProps) {
         <p className="text-xs text-muted-foreground mt-2">
           All {projects.length} project{projects.length === 1 ? "" : "s"} look stable on delivery signals.
         </p>
+      )}
+
+      {clientId && (
+        <RecoveryTaskCreateDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          clientId={clientId}
+          defaults={dialogDefaults}
+        />
       )}
     </div>
   );

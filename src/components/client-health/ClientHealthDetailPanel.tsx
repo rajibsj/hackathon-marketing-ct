@@ -93,7 +93,7 @@ export function ClientHealthDetailPanel({
             <RetentionCopilotSignalsSummary signals={snapshot.signals} />
           )}
 
-          <ClientProjectConcerns signals={snapshot.signals} />
+          <ClientProjectConcerns signals={snapshot.signals} clientId={snapshot.client_id} />
 
           {snapshot.root_causes.length > 0 && (
             <div>

@@ -8,10 +8,12 @@ Welcome to the comprehensive documentation for the SJ Marketing AI platform. Thi
 
 If you're new to the codebase, start here:
 
-1. **[System/project_architecture.md](./System/project_architecture.md)** - Get a complete overview of the system
-2. **[System/database_schema.md](./System/database_schema.md)** - Understand the database structure
-3. **[System/ai_agent_system.md](./System/ai_agent_system.md)** - Learn how AI agents work
-4. **Root CLAUDE.md** - Read the project-level instructions for Claude Code
+1. **[System/marketing-control-tower-business-overview.md](./System/marketing-control-tower-business-overview.md)** - Business vision, personas, workflows, retention copilot value
+2. **[System/marketing-control-tower-architecture.md](./System/marketing-control-tower-architecture.md)** - Current architecture, layers, data flows, deployment
+3. **[System/project_architecture.md](./System/project_architecture.md)** - Detailed system architecture (legacy deep dive)
+4. **[System/database_schema.md](./System/database_schema.md)** - Understand the database structure
+5. **[System/ai_agent_system.md](./System/ai_agent_system.md)** - Learn how AI agents work
+6. **Root CLAUDE.md** - Read the project-level instructions for Claude Code
 
 ---
 
@@ -22,6 +24,19 @@ If you're new to the codebase, start here:
 Documentation about the current state of the system - architecture, tech stack, database schema, and core functionalities.
 
 #### Core System Documentation
+
+**[marketing-control-tower-business-overview.md](./System/marketing-control-tower-business-overview.md)** - Business Overview (Mar 2026)
+- Product vision and problem statement
+- User personas (PM, account manager, leadership)
+- Core capabilities and retention copilot business value
+- Risk bands, workflows, domain model, KPIs
+- Scope (in/out of scope) and operational checklist
+
+**[marketing-control-tower-architecture.md](./System/marketing-control-tower-architecture.md)** - Architecture Document (Mar 2026)
+- System context and layer architecture
+- Auth, deployment topology, security
+- Client Retention Copilot technical flows
+- Integration map and key file reference
 
 **[project_architecture.md](./System/project_architecture.md)** - Complete System Architecture
 - Executive summary and scale indicators
@@ -416,7 +431,7 @@ For questions about this documentation or the codebase:
 
 **Last Updated:** 2026-03-20
 
-**Documentation Version:** 2.3.0
+**Documentation Version:** 2.4.0
 
 **Codebase Version:** See git commit history
 
@@ -449,6 +464,8 @@ This documentation structure now includes:
 ### Recent Documentation Updates (Mar 20, 2026)
 
 **New:**
+- `System/marketing-control-tower-architecture.md` — Full architecture document with retention copilot flows
+- `System/marketing-control-tower-business-overview.md` — Business document with personas, workflows, KPIs
 - `System/features/client-retention-copilot.md` — Retention Copilot architecture, data sources, routes, deployment
 - Root `README.md` — Setup, demo login, retention copilot workflow and troubleshooting
 

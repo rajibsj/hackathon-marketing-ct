@@ -77,6 +77,7 @@ Analyze the provided client profile and aggregated signals JSON. Produce a churn
 Signals focus on delivery from ActiveCollab and Control Tower: project tasks, task comments, and due dates/deadlines.
 Meetings are only included when mapped to a client project.
 Use project_breakdown in signals to address concerns project-by-project, including meeting_concern_keywords from saved transcript scans.
+Completed recovery tasks (recovery_tasks.resolved_concerns) mean those concerns were addressed — improve health_score and lower churn_probability accordingly.
 Weight meeting transcript concern keywords (disappointed, frustrating, overdue, missed deadline, sue, etc.) heavily when scoring churn risk.
 Do not infer risk from HubSpot, Slack, Teams, website traffic, search console, or invoice data.
 
@@ -110,6 +111,61 @@ Include 2-4 recovery plan items and 2-3 recommended_actions.`;
 function isTaskDone(status: string | null): boolean {
   if (!status) return false;
   return DONE_STATUSES.includes(status.toLowerCase());
+}
+
+const RECOVERY_TASK_SOURCE = "client-retention-copilot";
+const RECOVERY_TITLE_PREFIX = "[Recovery]";
+
+function isRecoveryTask(task: Record<string, unknown>): boolean {
+  const description = String(task.description || "");
+  const title = String(task.title || "");
+  return description.includes(RECOVERY_TASK_SOURCE) || title.startsWith(RECOVERY_TITLE_PREFIX);
+}
+
+function extractConcernFromRecoveryDescription(description: string): string | null {
+  for (const line of description.split("\n")) {
+    if (line.startsWith("Concern:")) {
+      return line.slice("Concern:".length).trim() || null;
+    }
+  }
+  const beforeSource = description.split("\n---\n")[0]?.trim();
+  if (beforeSource && !beforeSource.includes("Source:")) {
+    return beforeSource;
+  }
+  return null;
+}
+
+function buildResolvedConcernsByProject(
+  allTasks: Array<Record<string, unknown>>,
+): Map<string, Set<string>> {
+  const byProject = new Map<string, Set<string>>();
+
+  for (const task of allTasks) {
+    if (!isRecoveryTask(task) || !isTaskDone(task.status as string)) continue;
+
+    const concern = extractConcernFromRecoveryDescription(String(task.description || ""));
+    if (!concern) continue;
+
+    const projectId = task.project_id ? String(task.project_id) : "unassigned";
+    if (!byProject.has(projectId)) {
+      byProject.set(projectId, new Set());
+    }
+    byProject.get(projectId)!.add(concern);
+  }
+
+  return byProject;
+}
+
+function concernResolved(
+  concern: string,
+  projectId: string,
+  resolvedConcernsByProject: Map<string, Set<string>>,
+): boolean {
+  const projectResolved = resolvedConcernsByProject.get(projectId);
+  if (projectResolved?.has(concern)) return true;
+
+  const unassignedResolved = resolvedConcernsByProject.get("unassigned");
+  return unassignedResolved?.has(concern) ?? false;
 }
 
 function computeRiskBand(score: number, churnProb: number): HealthAnalysis["risk_band"] {
@@ -272,6 +328,7 @@ function buildProjectBreakdown(
   fourteenDaysAgo: Date,
   sevenDaysAhead: Date,
   formatTask: (task: Record<string, unknown>) => Record<string, unknown>,
+  resolvedConcernsByProject: Map<string, Set<string>>,
 ) {
   const buildForTasks = (
     projectId: string,
@@ -340,6 +397,25 @@ function buildProjectBreakdown(
       concerns.push("No recent project-mapped meeting transcripts");
     }
 
+    const activeConcerns = concerns.filter(
+      (concern) => !concernResolved(concern, projectId, resolvedConcernsByProject),
+    );
+
+    const meetingKeywordsConcern = meetingConcerns.keywords.length > 0
+      ? `Meeting transcript concern keywords: ${meetingConcerns.keywords.join(", ")}`
+      : null;
+    const meetingKeywordsResolved = meetingKeywordsConcern
+      ? concernResolved(meetingKeywordsConcern, projectId, resolvedConcernsByProject)
+      : false;
+
+    const activeMeetingKeywords = meetingKeywordsResolved ? [] : meetingConcerns.keywords;
+    const activeMeetingFlags = meetingConcerns.flags.filter((flag) => {
+      const normalized = flag.startsWith("Keyword") ? flag : `Meeting concern: ${flag}`;
+      return !concernResolved(normalized, projectId, resolvedConcernsByProject);
+    });
+
+    const resolvedConcernCount = concerns.length - activeConcerns.length;
+
     return {
       project_id: projectId,
       project_name: projectName,
@@ -362,10 +438,11 @@ function buildProjectBreakdown(
         concern_keywords: m.concern_keywords || [],
         has_client_concerns: Boolean(m.has_client_concerns),
       })),
-      meeting_concern_keywords: meetingConcerns.keywords,
-      meeting_concern_count: meetingConcerns.keywords.length,
-      meeting_concern_flags: meetingConcerns.flags.slice(0, 5),
-      concerns,
+      meeting_concern_keywords: activeMeetingKeywords,
+      meeting_concern_count: activeMeetingKeywords.length,
+      meeting_concern_flags: activeMeetingFlags.slice(0, 5),
+      concerns: activeConcerns,
+      resolved_concern_count: resolvedConcernCount,
     };
   };
 
@@ -425,7 +502,7 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
   if (projectIds.length > 0) {
     const { data: projectTasks } = await supabase
       .from("project_tasks")
-      .select("id, title, status, priority, due_date, updated_at, created_at, project_id, brand_id, activecollab_task_id")
+      .select("id, title, description, status, priority, due_date, updated_at, created_at, project_id, brand_id, activecollab_task_id")
       .in("project_id", projectIds);
 
     tasks = projectTasks || [];
@@ -433,7 +510,7 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
 
   const { data: clientTasks } = await supabase
     .from("project_tasks")
-    .select("id, title, status, priority, due_date, updated_at, created_at, project_id, brand_id")
+    .select("id, title, description, status, priority, due_date, updated_at, created_at, project_id, brand_id")
     .eq("client_id", clientId);
 
   const taskMap = new Map<string, Record<string, unknown>>();
@@ -574,6 +651,8 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
     ? storedMeetingFlags
     : flagNegativeComments(meetingTexts);
 
+  const resolvedConcernsByProject = buildResolvedConcernsByProject(allTasks);
+
   const projectBreakdown = buildProjectBreakdown(
     projects || [],
     allTasks,
@@ -584,11 +663,21 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
     fourteenDaysAgo,
     sevenDaysAhead,
     formatTask,
+    resolvedConcernsByProject,
   );
 
   const meetingConcernKeywordCount = projectBreakdown.reduce(
     (sum, project) => sum + (Number(project.meeting_concern_count) || 0),
     0,
+  );
+
+  const resolvedConcernCount = projectBreakdown.reduce(
+    (sum, project) => sum + (Number(project.resolved_concern_count) || 0),
+    0,
+  );
+
+  const completedRecoveryTasks = allTasks.filter(
+    (task) => isRecoveryTask(task) && isTaskDone(task.status as string),
   );
 
   let heuristicScore = client.satisfaction_score ?? 85;
@@ -608,6 +697,9 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
   }
   if (approachingDeadlineTasks.length >= 3) {
     heuristicScore -= 5;
+  }
+  if (resolvedConcernCount > 0) {
+    heuristicScore += Math.min(resolvedConcernCount * 6, 30);
   }
   heuristicScore = Math.max(0, Math.min(100, heuristicScore));
 
@@ -632,6 +724,11 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
       activecollab_task_count: activecollabTaskCount,
       control_tower_task_count: controlTowerTaskCount,
       project_breakdown: projectBreakdown,
+      recovery_tasks: {
+        completed_count: completedRecoveryTasks.length,
+        resolved_concern_count: resolvedConcernCount,
+        resolved_concerns: Array.from(resolvedConcernsByProject.values()).flatMap((set) => [...set]),
+      },
       delivery: {
         activecollab_task_count: activecollabTaskCount,
         control_tower_task_count: controlTowerTaskCount,

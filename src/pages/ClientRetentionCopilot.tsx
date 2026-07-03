@@ -46,6 +46,12 @@ export default function ClientRetentionCopilot() {
     }
   }, [focusClientId, snapshots, isLoading]);
 
+  useEffect(() => {
+    if (!selectedSnapshot) return;
+    const updated = snapshots.find((s) => s.client_id === selectedSnapshot.client_id);
+    if (updated) setSelectedSnapshot(updated);
+  }, [snapshots, selectedSnapshot?.client_id]);
+
   const handleSelectClient = (snapshot: ClientHealthSnapshot) => {
     setSelectedSnapshot(snapshot);
     setDetailOpen(true);

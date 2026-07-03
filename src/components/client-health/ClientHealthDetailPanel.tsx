@@ -7,6 +7,7 @@ import { getBandConfig } from "./HealthPortfolioSummary";
 import { RecoveryActionBar } from "./RecoveryActionBar";
 import { ClientRecoveryTasksExpandable } from "./ClientRecoveryTasksExpandable";
 import { ClientProjectConcerns } from "./ClientProjectConcerns";
+import { RetentionCopilotSignalsSummary } from "./RetentionCopilotSignalsSummary";
 import { formatDistanceToNow } from "date-fns";
 import { AlertTriangle, CheckCircle2, Lightbulb, ListTodo, Loader2, Play } from "lucide-react";
 
@@ -86,6 +87,10 @@ export function ClientHealthDetailPanel({
               <h4 className="text-sm font-semibold mb-2">Why This Score</h4>
               <p className="text-sm text-muted-foreground">{snapshot.explanation}</p>
             </div>
+          )}
+
+          {snapshot.summary && Object.keys(snapshot.signals || {}).length > 0 && (
+            <RetentionCopilotSignalsSummary signals={snapshot.signals} />
           )}
 
           <ClientProjectConcerns signals={snapshot.signals} />

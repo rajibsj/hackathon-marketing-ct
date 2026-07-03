@@ -606,6 +606,7 @@ const ImportedProjectDetail = () => {
             {projectId && (
               <ProjectRetentionMeetings
                 projectId={projectId}
+                clientId={project?.client_id}
                 meetings={project?.retention_meeting_transcripts}
                 signalText={project?.retention_meeting_signal_text}
                 onSaved={({ meetings, signalText }) =>

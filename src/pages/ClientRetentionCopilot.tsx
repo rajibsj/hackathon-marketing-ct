@@ -122,14 +122,31 @@ export default function ClientRetentionCopilot() {
           "ActiveCollab Tasks",
           "Control Tower Tasks",
           "Task Comments",
-          "Deadlines",
-          "Project Meeting Transcripts",
+          "Overdue Deadlines",
+          "Stale Tasks",
+          "Meeting Concern Text",
         ].map((source) => (
           <Badge key={source} variant="outline" className="text-xs">
             {source}
           </Badge>
         ))}
       </div>
+
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>How data flows in</AlertTitle>
+        <AlertDescription className="text-sm space-y-2">
+          <p>
+            Each analysis combines <strong>ActiveCollab</strong> and <strong>Control Tower</strong>{" "}
+            tasks, overdue and approaching deadlines, stale tasks with no updates, negative task
+            comments, and saved <strong>meeting concern text</strong> from project Meetings tabs.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            On a project → Meetings: upload or scan transcripts, then Save or Regenerate concern
+            text. Return here and click Analyze Client to refresh scores.
+          </p>
+        </AlertDescription>
+      </Alert>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">

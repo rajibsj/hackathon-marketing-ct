@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Link as LinkIcon, Plus, Sparkles, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Link as LinkIcon, Plus, Sparkles, Trash2, AlertTriangle, Upload, RefreshCw, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
+import { getClientRetentionCopilotUrl } from "@/lib/clientSlugUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -15,6 +17,7 @@ import {
   applyGeneratedTextToMeetings,
   buildRetentionMeetingSignalText,
   createEmptyRetentionMeeting,
+  hydrateRetentionMeetingRow,
   parseRetentionMeetings,
 } from "@/lib/retentionMeetingText";
 import { scanMeetingTranscriptForConcerns } from "@/lib/meetingConcernScan";
@@ -30,14 +33,22 @@ interface ScanResponse {
   error?: string;
 }
 
+const MAX_UPLOAD_BYTES = 200_000;
+const ACCEPTED_TRANSCRIPT_TYPES = ".txt,.md,.vtt,.srt,text/plain,text/markdown";
+
 interface ProjectRetentionMeetingsProps {
   projectId: string;
+  clientId?: string | null;
   meetings?: unknown;
   signalText?: string | null;
   onSaved?: (payload: {
     meetings: RetentionMeetingEntry[];
     signalText: string | null;
   }) => void;
+}
+
+function rowHasTranscriptSource(row: RetentionMeetingEntry) {
+  return Boolean(row.transcript_link.trim() || row.transcript_text?.trim());
 }
 
 async function scanMeetingRow(row: RetentionMeetingEntry): Promise<RetentionMeetingEntry> {
@@ -65,6 +76,10 @@ async function scanMeetingRow(row: RetentionMeetingEntry): Promise<RetentionMeet
 
   if (data?.error) {
     throw new Error(data.error);
+  }
+
+  if (data?.fetch_error && !data?.transcript_text?.trim()) {
+    throw new Error(data.fetch_error);
   }
 
   const scanAt = data?.keyword_scan_at || new Date().toISOString();
@@ -120,8 +135,63 @@ function normalizeMeetingRow(row: RetentionMeetingEntry): RetentionMeetingEntry 
   };
 }
 
+function ConcernKeywordTags({ row }: { row: RetentionMeetingEntry }) {
+  const keywords = row.concern_keywords || [];
+  const hasStoredScan = Boolean(row.keyword_scan_at) || keywords.length > 0;
+
+  if (!hasStoredScan) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No scan yet — add a link or upload a file, then click Scan for concern keywords.
+      </p>
+    );
+  }
+
+  if (keywords.length === 0) {
+    return (
+      <div className="space-y-1">
+        <Badge variant="secondary" className="text-xs">
+          No concern keywords detected
+        </Badge>
+        {row.keyword_scan_at && (
+          <p className="text-[10px] text-muted-foreground">
+            Scanned {new Date(row.keyword_scan_at).toLocaleString()}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {keywords.map((keyword) => (
+          <Badge
+            key={`${row.id}-${keyword}`}
+            variant="destructive"
+            className="text-xs capitalize"
+          >
+            {keyword}
+          </Badge>
+        ))}
+      </div>
+      {row.concern_hits?.[0] && (
+        <p className="text-xs text-muted-foreground italic">
+          &ldquo;{row.concern_hits[0].excerpt}&rdquo;
+        </p>
+      )}
+      {row.keyword_scan_at && (
+        <p className="text-[10px] text-muted-foreground">
+          Scanned {new Date(row.keyword_scan_at).toLocaleString()}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ProjectRetentionMeetings({
   projectId,
+  clientId,
   meetings,
   signalText,
   onSaved,
@@ -131,95 +201,16 @@ export function ProjectRetentionMeetings({
   const [generatedPreview, setGeneratedPreview] = useState(signalText ?? "");
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [uploadingRowId, setUploadingRowId] = useState<string | null>(null);
   const [scanningRowId, setScanningRowId] = useState<string | null>(null);
-  const scanTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const lastScannedRef = useRef<Map<string, string>>(new Map());
 
   const getScanKey = (row: RetentionMeetingEntry) =>
     `${row.transcript_link.trim()}|${row.transcript_text?.trim() || ""}`;
 
-  const clearScanTimer = useCallback((rowId: string) => {
-    const timer = scanTimersRef.current.get(rowId);
-    if (timer) {
-      clearTimeout(timer);
-      scanTimersRef.current.delete(rowId);
-    }
-  }, []);
-
-  const applyScannedRow = useCallback((rowId: string, scanned: RetentionMeetingEntry) => {
-    setRows((current) => current.map((item) => (item.id === rowId ? scanned : item)));
-  }, []);
-
-  const runRowScan = useCallback(
-    async (rowId: string, options?: { silent?: boolean; force?: boolean }) => {
-      const row = rowsRef.current.find((item) => item.id === rowId);
-      if (!row) return;
-
-      const trimmedLink = row.transcript_link.trim();
-      const trimmedText = row.transcript_text?.trim() || "";
-
-      if (!trimmedLink && !trimmedText) {
-        lastScannedRef.current.delete(rowId);
-        applyScannedRow(rowId, {
-          ...row,
-          concern_keywords: [],
-          concern_flags: [],
-          concern_hits: [],
-          has_client_concerns: false,
-          keyword_scan_at: null,
-        });
-        return;
-      }
-
-      const scanKey = getScanKey(row);
-      if (!options?.force && lastScannedRef.current.get(rowId) === scanKey) {
-        return;
-      }
-
-      setScanningRowId(rowId);
-      try {
-        const scanned = await scanMeetingRow(normalizeMeetingRow(row));
-        lastScannedRef.current.set(rowId, scanKey);
-        applyScannedRow(rowId, scanned);
-
-        if (!options?.silent && scanned.has_client_concerns) {
-          toast.warning(
-            `Found ${scanned.concern_keywords?.length || 0} concern keyword(s) in this meeting`,
-          );
-        }
-      } catch (error) {
-        if (trimmedText) {
-          const localScanned = applyConcernScanToMeeting(normalizeMeetingRow(row));
-          lastScannedRef.current.set(rowId, scanKey);
-          applyScannedRow(rowId, localScanned);
-        } else if (!options?.silent) {
-          const message = error instanceof Error ? error.message : "Failed to scan transcript link";
-          toast.error(message);
-        }
-      } finally {
-        setScanningRowId((current) => (current === rowId ? null : current));
-      }
-    },
-    [applyScannedRow],
-  );
-
-  const scheduleAutoScan = useCallback(
-    (rowId: string, delayMs = 700) => {
-      clearScanTimer(rowId);
-      const timer = setTimeout(() => {
-        void runRowScan(rowId, { silent: true });
-      }, delayMs);
-      scanTimersRef.current.set(rowId, timer);
-    },
-    [clearScanTimer, runRowScan],
-  );
-
-  useEffect(() => {
-    const timers = scanTimersRef.current;
-    return () => {
-      timers.forEach((timer) => clearTimeout(timer));
-      timers.clear();
-    };
+  const replaceRows = useCallback((next: RetentionMeetingEntry[]) => {
+    rowsRef.current = next;
+    setRows(next);
   }, []);
 
   useEffect(() => {
@@ -227,10 +218,9 @@ export function ProjectRetentionMeetings({
   }, [rows]);
 
   useEffect(() => {
-    const parsed = parseRetentionMeetings(meetings);
-    setRows(parsed.length > 0 ? parsed : [createEmptyRetentionMeeting()]);
-    setGeneratedPreview(signalText ?? "");
-  }, [meetings, signalText]);
+    const parsed = parseRetentionMeetings(meetings).map(hydrateRetentionMeetingRow);
+    replaceRows(parsed.length > 0 ? parsed : [createEmptyRetentionMeeting()]);
+  }, [meetings, replaceRows]);
 
   const updateRow = (id: string, patch: Partial<RetentionMeetingEntry>) => {
     setRows((current) => {
@@ -241,19 +231,60 @@ export function ProjectRetentionMeetings({
   };
 
   const addRow = () => {
-    setRows((current) => [...current, createEmptyRetentionMeeting()]);
+    setRows((current) => {
+      const next = [...current, createEmptyRetentionMeeting()];
+      rowsRef.current = next;
+      return next;
+    });
   };
 
   const removeRow = (id: string) => {
     setRows((current) => {
       const next = current.filter((row) => row.id !== id);
-      return next.length > 0 ? next : [createEmptyRetentionMeeting()];
+      const resolved = next.length > 0 ? next : [createEmptyRetentionMeeting()];
+      rowsRef.current = resolved;
+      return resolved;
     });
   };
 
-  const validRows = rows.filter(
-    (row) => row.transcript_link.trim() || row.transcript_text?.trim(),
-  );
+  const validRows = rows.filter(rowHasTranscriptSource);
+
+  const normalizeRows = (input: RetentionMeetingEntry[]) => input.map(normalizeMeetingRow);
+
+  useEffect(() => {
+    const valid = rows.filter(rowHasTranscriptSource);
+    if (valid.length === 0) {
+      setGeneratedPreview(signalText?.trim() || "");
+      return;
+    }
+
+    const normalized = normalizeRows(valid);
+    const withGenerated = applyGeneratedTextToMeetings(normalized);
+    setGeneratedPreview(buildRetentionMeetingSignalText(withGenerated));
+  }, [rows, signalText]);
+
+  const mergeScannedRows = (
+    allRows: RetentionMeetingEntry[],
+    scannedRows: RetentionMeetingEntry[],
+  ) => {
+    const scannedMap = new Map(scannedRows.map((row) => [row.id, row]));
+    const merged = allRows.map((row) => scannedMap.get(row.id) || row);
+    return merged.length > 0 ? merged : [createEmptyRetentionMeeting()];
+  };
+
+  const buildConcernTextFromRows = (inputRows: RetentionMeetingEntry[]) => {
+    const normalized = normalizeRows(inputRows.filter(rowHasTranscriptSource));
+    const withGenerated = applyGeneratedTextToMeetings(normalized);
+    const signal = buildRetentionMeetingSignalText(withGenerated);
+    return { withGenerated, signal, merged: mergeScannedRows(inputRows, withGenerated) };
+  };
+
+  const applyConcernTextPreview = (inputRows: RetentionMeetingEntry[]) => {
+    const { withGenerated, signal, merged } = buildConcernTextFromRows(inputRows);
+    replaceRows(merged);
+    setGeneratedPreview(signal);
+    return { withGenerated, signal };
+  };
 
   const persist = async (
     nextMeetings: RetentionMeetingEntry[],
@@ -273,47 +304,133 @@ export function ProjectRetentionMeetings({
     onSaved?.({ meetings: nextMeetings, signalText: nextSignalText });
   };
 
-  const normalizeRows = (input: RetentionMeetingEntry[]) => input.map(normalizeMeetingRow);
+  const scanAndPersistRow = async (rowId: string) => {
+    const row = rowsRef.current.find((item) => item.id === rowId);
+    if (!row || !rowHasTranscriptSource(row)) {
+      throw new Error("Add a transcript link or upload a transcript file first");
+    }
+
+    setScanningRowId(rowId);
+    try {
+      const scanned = await scanMeetingRow(normalizeMeetingRow(row));
+      lastScannedRef.current.set(rowId, getScanKey(scanned));
+
+      const rowsWithScan = rowsRef.current.map((item) => (item.id === rowId ? scanned : item));
+      replaceRows(rowsWithScan);
+
+      const { withGenerated, signal } = applyConcernTextPreview(rowsWithScan);
+      await persist(withGenerated, signal);
+
+      return scanned;
+    } finally {
+      setScanningRowId((current) => (current === rowId ? null : current));
+    }
+  };
 
   const handleScanRow = async (rowId: string) => {
-    await runRowScan(rowId, { force: true });
+    try {
+      const scanned = await scanAndPersistRow(rowId);
+      if (scanned.has_client_concerns) {
+        toast.warning(
+          `Found ${scanned.concern_keywords?.length || 0} concern keyword(s)`,
+        );
+      } else {
+        toast.success("Scan complete — no concern keywords detected");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to scan for concern keywords";
+      toast.error(message);
+    }
   };
 
   const handleLinkChange = (rowId: string, value: string) => {
-    updateRow(rowId, { transcript_link: value });
+    updateRow(rowId, {
+      transcript_link: value,
+      keyword_scan_at: null,
+      concern_keywords: [],
+      concern_flags: [],
+      concern_hits: [],
+      has_client_concerns: false,
+    });
     lastScannedRef.current.delete(rowId);
-    if (value.trim()) {
-      scheduleAutoScan(rowId);
-    }
   };
 
-  const handleLinkBlur = (rowId: string) => {
-    clearScanTimer(rowId);
-    const row = rowsRef.current.find((item) => item.id === rowId);
-    if (row?.transcript_link.trim()) {
-      void runRowScan(rowId, { silent: true, force: true });
+  const handleFileUpload = async (rowId: string, file: File) => {
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error("Transcript file is too large (max 200KB)");
+      return;
     }
-  };
 
-  const handleTextChange = (rowId: string, value: string) => {
-    updateRow(rowId, { transcript_text: value });
-    lastScannedRef.current.delete(rowId);
-    if (value.trim()) {
-      scheduleAutoScan(rowId, 500);
-    } else {
-      const row = rowsRef.current.find((item) => item.id === rowId);
-      if (row && !row.transcript_link.trim()) {
-        lastScannedRef.current.delete(rowId);
-        applyScannedRow(rowId, {
-          ...row,
-          transcript_text: "",
-          concern_keywords: [],
-          concern_flags: [],
-          concern_hits: [],
-          has_client_concerns: false,
-          keyword_scan_at: null,
-        });
+    setUploadingRowId(rowId);
+    try {
+      const text = (await file.text()).trim();
+      if (!text) {
+        toast.error("Uploaded file is empty");
+        return;
       }
+
+      const row = rowsRef.current.find((item) => item.id === rowId);
+      if (!row) return;
+
+      const updatedRow = normalizeMeetingRow({
+        ...row,
+        transcript_text: text,
+        transcript_link: "",
+        title: row.title.trim() || file.name.replace(/\.[^.]+$/, ""),
+        concern_keywords: [],
+        concern_flags: [],
+        concern_hits: [],
+        has_client_concerns: false,
+        keyword_scan_at: null,
+      });
+
+      const nextRows = rowsRef.current.map((item) => (item.id === rowId ? updatedRow : item));
+      replaceRows(nextRows);
+
+      const scanned = await scanAndPersistRow(rowId);
+
+      if (scanned.has_client_concerns) {
+        toast.warning(
+          `Uploaded transcript scanned — ${scanned.concern_keywords?.length || 0} concern keyword(s) found`,
+        );
+      } else {
+        toast.success("Transcript uploaded — no concern keywords detected");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to process uploaded transcript";
+      toast.error(message);
+    } finally {
+      setUploadingRowId(null);
+    }
+  };
+
+  const handleRegenerateConcernText = async () => {
+    if (validRows.length === 0) {
+      toast.error("Add at least one meeting link or upload a transcript file");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const normalized = normalizeRows(validRows);
+      const scanned = await enrichMeetingsWithConcernScan(normalized);
+      const merged = mergeScannedRows(rowsRef.current, scanned);
+      replaceRows(merged);
+
+      const { withGenerated, signal } = applyConcernTextPreview(merged);
+      await persist(withGenerated, signal);
+
+      const concernMeetings = withGenerated.filter((entry) => entry.has_client_concerns).length;
+      toast.success(
+        concernMeetings > 0
+          ? `Concern text regenerated — ${concernMeetings} meeting(s) flagged. Run Analyze Client in Retention Copilot.`
+          : "Concern text regenerated. Run Analyze Client in Retention Copilot.",
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to regenerate concern text";
+      toast.error(message);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -322,9 +439,12 @@ export function ProjectRetentionMeetings({
     try {
       const normalized = normalizeRows(validRows);
       const scanned = await enrichMeetingsWithConcernScan(normalized);
-      await persist(scanned, generatedPreview.trim() || null);
-      setRows(scanned.length > 0 ? scanned : rows);
-      toast.success("Meetings saved with concern keyword scan");
+      const merged = mergeScannedRows(rowsRef.current, scanned);
+      const { withGenerated, signal } = applyConcernTextPreview(merged);
+      await persist(withGenerated, signal);
+      toast.success(
+        "Meetings saved — concern text stored for Retention Copilot. Run Analyze Client to apply.",
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save meeting links";
       toast.error(message);
@@ -333,38 +453,7 @@ export function ProjectRetentionMeetings({
     }
   };
 
-  const handleGenerate = async () => {
-    if (validRows.length === 0) {
-      toast.error("Add at least one meeting link or transcript text");
-      return;
-    }
-
-    setGenerating(true);
-    try {
-      const normalized = normalizeRows(validRows);
-      const scanned = await enrichMeetingsWithConcernScan(normalized);
-      const withGenerated = applyGeneratedTextToMeetings(scanned);
-      const signal = buildRetentionMeetingSignalText(withGenerated);
-
-      setRows(withGenerated);
-      setGeneratedPreview(signal);
-      await persist(withGenerated, signal);
-
-      const concernMeetings = withGenerated.filter((entry) => entry.has_client_concerns).length;
-      toast.success(
-        concernMeetings > 0
-          ? `Retention text generated — ${concernMeetings} meeting(s) flagged with client concerns`
-          : "Retention copilot text generated",
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to generate retention text";
-      toast.error(message);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const isBusy = saving || generating || scanningRowId !== null;
+  const isBusy = saving || generating || scanningRowId !== null || uploadingRowId !== null;
 
   return (
     <Card>
@@ -374,11 +463,32 @@ export function ProjectRetentionMeetings({
           Retention meeting transcripts
         </CardTitle>
         <CardDescription>
-          Meeting links and transcript text are scanned for client concern keywords (e.g. disappointed,
-          frustrating, overdue, missed deadline, sue) and saved for future retention scoring.
+          Scan meeting transcripts for concern keywords, then save or regenerate concern text.
+          The Retention Copilot uses this alongside ActiveCollab tasks, Control Tower tasks,
+          task comments, overdue deadlines, and stale work.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Alert>
+          <Shield className="h-4 w-4" />
+          <AlertDescription className="text-xs space-y-2">
+            <p>
+              <strong>Save meetings</strong> or <strong>Regenerate concern text</strong> stores
+              keyword tags and summary text on this project. The Retention Copilot reads that on
+              the next <strong>Analyze Client</strong> run, combined with delivery data from
+              ActiveCollab and Control Tower.
+            </p>
+            {clientId && (
+              <Link
+                to={getClientRetentionCopilotUrl(clientId)}
+                className="inline-flex items-center gap-1 text-primary font-medium hover:underline"
+              >
+                Open Retention Copilot for this client →
+              </Link>
+            )}
+          </AlertDescription>
+        </Alert>
+
         {rows.map((row, index) => (
           <div key={row.id} className="rounded-lg border p-4 space-y-3">
             <div className="flex items-center justify-between gap-2">
@@ -388,6 +498,11 @@ export function ProjectRetentionMeetings({
                   <Badge variant="destructive" className="text-[10px]">
                     <AlertTriangle className="h-3 w-3 mr-1" />
                     Client concerns
+                  </Badge>
+                )}
+                {row.transcript_text?.trim() && !row.transcript_link.trim() && (
+                  <Badge variant="outline" className="text-[10px]">
+                    File uploaded
                   </Badge>
                 )}
               </div>
@@ -434,65 +549,61 @@ export function ProjectRetentionMeetings({
                 placeholder="https://..."
                 value={row.transcript_link}
                 onChange={(e) => handleLinkChange(row.id, e.target.value)}
-                onBlur={() => handleLinkBlur(row.id)}
-                disabled={isBusy}
+                disabled={isBusy || Boolean(row.transcript_text?.trim() && !row.transcript_link.trim())}
               />
-              {scanningRowId === row.id && row.transcript_link.trim() && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Scanning link for concern keywords…
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor={`meeting-text-${row.id}`}>Transcript text (optional)</Label>
-              <Textarea
-                id={`meeting-text-${row.id}`}
-                placeholder="Paste transcript text — keywords appear automatically after you stop typing"
-                value={row.transcript_text || ""}
-                onChange={(e) => handleTextChange(row.id, e.target.value)}
-                disabled={isBusy}
-                rows={3}
-              />
-            </div>
-
-            {scanningRowId === row.id && row.transcript_text?.trim() && !row.transcript_link.trim() && (
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Scanning text for concern keywords…
-              </p>
-            )}
-
-            {(row.concern_keywords?.length || 0) > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Detected concern keywords</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {row.concern_keywords?.map((keyword) => (
-                    <Badge key={`${row.id}-${keyword}`} variant="outline" className="text-xs">
-                      {keyword}
-                    </Badge>
-                  ))}
-                </div>
-                {row.concern_hits?.[0] && (
-                  <p className="text-xs text-muted-foreground italic">
-                    "{row.concern_hits[0].excerpt}"
-                  </p>
-                )}
-                {row.keyword_scan_at && (
-                  <p className="text-[10px] text-muted-foreground">
-                    Scanned {new Date(row.keyword_scan_at).toLocaleString()}
-                  </p>
-                )}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  id={`meeting-upload-${row.id}`}
+                  type="file"
+                  accept={ACCEPTED_TRANSCRIPT_TYPES}
+                  className="hidden"
+                  disabled={isBusy}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (file) {
+                      void handleFileUpload(row.id, file);
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isBusy}
+                  onClick={() => document.getElementById(`meeting-upload-${row.id}`)?.click()}
+                >
+                  {uploadingRowId === row.id ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload transcript
+                    </>
+                  )}
+                </Button>
+                <span className="text-[11px] text-muted-foreground">
+                  .txt, .md, .vtt, .srt — auto-scans on upload
+                </span>
               </div>
-            )}
+            </div>
+
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Concern keywords
+              </p>
+              <ConcernKeywordTags row={row} />
+            </div>
 
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={() => handleScanRow(row.id)}
-              disabled={isBusy || (!row.transcript_link.trim() && !row.transcript_text?.trim())}
+              disabled={isBusy || !rowHasTranscriptSource(row)}
             >
               {scanningRowId === row.id ? (
                 <>
@@ -515,8 +626,7 @@ export function ProjectRetentionMeetings({
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="text-xs">
             Keywords tracked include: disappointing, frustrating, overdue, missed deadline, sue,
-            lawsuit, complaint, cancel, refund, and similar client-risk phrases. Results are stored on
-            each meeting and used by the retention copilot on the next analysis run.
+            lawsuit, complaint, cancel, refund, and similar client-risk phrases.
           </AlertDescription>
         </Alert>
 
@@ -531,27 +641,37 @@ export function ProjectRetentionMeetings({
               "Save meetings"
             )}
           </Button>
-          <Button variant="secondary" onClick={handleGenerate} disabled={isBusy}>
+          <Button variant="secondary" onClick={handleRegenerateConcernText} disabled={isBusy}>
             {generating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating…
+                Regenerating…
               </>
             ) : (
               <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate retention text
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Regenerate concern text
               </>
             )}
           </Button>
         </div>
 
-        {generatedPreview && (
-          <div className="space-y-2">
-            <Label>Generated text for retention copilot</Label>
-            <Textarea value={generatedPreview} readOnly rows={8} className="font-mono text-xs" />
-          </div>
-        )}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            Generated concern text for retention copilot
+          </Label>
+          <Textarea
+            value={generatedPreview}
+            readOnly
+            rows={8}
+            placeholder="Add meeting transcripts to auto-generate retention signal text…"
+            className="font-mono text-xs"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Updates automatically when meetings are added, scanned, or edited.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

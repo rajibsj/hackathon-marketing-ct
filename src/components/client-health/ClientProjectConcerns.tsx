@@ -83,6 +83,9 @@ export function ClientProjectConcerns({ signals }: ClientProjectConcernsProps) {
               {(project.approaching_deadline_count ?? 0) > 0 && (
                 <span>{project.approaching_deadline_count} due soon</span>
               )}
+              {(project.stale_count ?? 0) > 0 && (
+                <span className="text-destructive">{project.stale_count} stale</span>
+              )}
               {(project.meeting_concern_count ?? 0) > 0 && (
                 <span className="text-destructive">
                   {project.meeting_concern_count} meeting concern keyword

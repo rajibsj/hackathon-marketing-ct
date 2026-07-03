@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { Mail, Phone, Calendar, TrendingUp, Loader2, MapPin, Building2, Globe, RefreshCw, Users, Handshake, DollarSign, Trash2, Edit, Target, ExternalLink, MessageSquareQuote } from "lucide-react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { Mail, Phone, Calendar, TrendingUp, Loader2, MapPin, Building2, Globe, RefreshCw, Users, Handshake, DollarSign, Trash2, Edit, Target, ExternalLink, MessageSquareQuote, Shield, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { ClientDialog } from "@/components/clients/ClientDialog";
 import { slugify } from "@/lib/slugify";
+import { getClientRetentionCopilotUrl } from "@/lib/clientSlugUtils";
+import { useClientHealth } from "@/hooks/useClientHealth";
 import { ClientStatsCard } from "@/components/clients/ClientStatsCard";
 import { ClientInfoCard } from "@/components/clients/ClientInfoCard";
 import { ClientProjectCard } from "@/components/clients/ClientProjectCard";
@@ -58,6 +60,7 @@ export default function ClientDetail() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { testimonials } = useTestimonials();
   const { entries } = useClientSentiment(clientId);
+  const { analyzePortfolioAsync, isAnalyzing } = useClientHealth();
 
   useEffect(() => {
     const loadClient = async () => {
@@ -67,6 +70,7 @@ export default function ClientDetail() {
       try {
         // Find client by matching slug against slugified company or name
         const matchedClient = clients.find(c => {
+          if (c.slug && c.slug === slug) return true;
           const clientSlug = slugify(c.company || c.name);
           return clientSlug === slug;
         });
@@ -193,6 +197,17 @@ export default function ClientDetail() {
   const totalBudget = projects.reduce((sum, p) => sum + (p.budget || 0), 0);
   const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'planning');
   const completedProjects = projects.filter(p => p.status === 'completed');
+
+  const handleRunRetentionAnalysis = async () => {
+    if (!clientId) return;
+    try {
+      await analyzePortfolioAsync(clientId);
+      navigate(getClientRetentionCopilotUrl(clientId));
+    } catch {
+      // Error toast handled by useClientHealth
+    }
+  };
+
   const clientTestimonials = testimonials.filter((testimonial) => {
     const matchesCompany = testimonial.companyName.toLowerCase() === client.company?.toLowerCase();
     const matchesName = testimonial.clientName.toLowerCase() === client.name.toLowerCase();
@@ -261,11 +276,31 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* Edit button */}
-          <Button onClick={() => setEditDialogOpen(true)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Client
-          </Button>
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Button variant="outline" asChild>
+              <Link to={getClientRetentionCopilotUrl(clientId)}>
+                <Shield className="mr-2 h-4 w-4" />
+                Retention Portfolio
+              </Link>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleRunRetentionAnalysis}
+              disabled={isAnalyzing || !clientId}
+            >
+              {isAnalyzing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              {isAnalyzing ? "Analyzing..." : "Run Analysis"}
+            </Button>
+            <Button onClick={() => setEditDialogOpen(true)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Client
+            </Button>
+          </div>
         </div>
 
         {/* Tab Navigation */}

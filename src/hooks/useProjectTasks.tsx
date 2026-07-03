@@ -252,9 +252,16 @@ export const useUpdateProjectTask = () => {
       const previousTask = queryClient.getQueryData(['project-task', id]);
 
       if (previousTask) {
+        const optimisticUpdates = { ...updates };
+        if (updates.status === 'completed' && !optimisticUpdates.completed_at) {
+          optimisticUpdates.completed_at = new Date().toISOString();
+        } else if (updates.status && updates.status !== 'completed') {
+          optimisticUpdates.completed_at = null;
+        }
+
         queryClient.setQueryData(['project-task', id], (old: any) => ({
           ...old,
-          ...updates,
+          ...optimisticUpdates,
         }));
       }
 
@@ -268,6 +275,8 @@ export const useUpdateProjectTask = () => {
       queryClient.invalidateQueries({ queryKey: ['project-task'] }); // Invalidate task detail queries
       queryClient.invalidateQueries({ queryKey: ['my-tasks'] }); // Invalidate my tasks
       queryClient.invalidateQueries({ queryKey: ['my-tasks-stats'] }); // Invalidate task stats
+      queryClient.invalidateQueries({ queryKey: ['recovery-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['recovery-tasks-summary'] });
       toast({
         title: "Task updated",
         description: "Project task has been updated successfully.",

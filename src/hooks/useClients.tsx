@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export interface Client {
   id: string;
   name: string;
+  slug?: string;
   email?: string;
   phone?: string;
   company?: string;

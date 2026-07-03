@@ -28,13 +28,23 @@ interface RecoveryStep {
 }
 
 interface RecommendedAction {
-  type: "create_task" | "draft_email" | "slack_notify";
+  type: "create_task" | "draft_email";
   title?: string;
   description?: string;
   priority?: string;
   subject?: string;
   body?: string;
-  message?: string;
+}
+
+interface MeetingSignal {
+  channel: string;
+  subject: string;
+  content_excerpt: string;
+  date: string;
+  source: "project_meeting" | "project_retention";
+  transcript_link?: string;
+  project_id?: string;
+  project_name?: string;
 }
 
 interface HealthAnalysis {
@@ -60,6 +70,11 @@ const DONE_STATUSES = ["completed", "done", "closed"];
 const SYSTEM_PROMPT = `You are an expert account manager and client retention specialist for a marketing agency.
 Analyze the provided client profile and aggregated signals JSON. Produce a churn risk assessment.
 
+Signals focus on delivery from ActiveCollab and Control Tower: project tasks, task comments, and due dates/deadlines.
+Meetings are only included when mapped to a client project.
+Use project_breakdown in signals to address concerns project-by-project.
+Do not infer risk from HubSpot, Slack, Teams, website traffic, search console, or invoice data.
+
 Return JSON with this exact structure:
 {
   "health_score": <integer 0-100>,
@@ -84,7 +99,8 @@ Risk band guidelines:
 - immediate: score 0-29, churn_probability > 0.80
 
 Weight combined signals — a single yellow flag may be fine, but multiple signals compound risk.
-Be specific with evidence from the signals. Include 2-4 recovery plan items and 2-3 recommended_actions.`;
+Be specific with evidence from the signals. Address risks per project when multiple projects exist.
+Include 2-4 recovery plan items and 2-3 recommended_actions.`;
 
 function isTaskDone(status: string | null): boolean {
   if (!status) return false;
@@ -113,6 +129,171 @@ function flagNegativeComments(comments: string[]): string[] {
   return flags;
 }
 
+function extractTranscriptText(
+  meeting: Record<string, unknown>,
+): string {
+  const description = String(meeting.meeting_description || "").trim();
+  if (description) return description;
+
+  const meetingData = meeting.meeting_data;
+  if (!meetingData || typeof meetingData !== "object") return "";
+
+  const data = meetingData as Record<string, unknown>;
+  return String(
+    data.transcript_summary ||
+      data.summary_overview ||
+      data.transcript ||
+      "",
+  ).trim();
+}
+
+function parseProjectRetentionMeetings(
+  value: unknown,
+): Array<{
+  title: string;
+  meeting_date: string;
+  transcript_link: string;
+  generated_text: string;
+}> {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const item = row as Record<string, unknown>;
+      const generated = String(item.generated_text || item.transcript_text || "").trim();
+      const link = String(item.transcript_link || "").trim();
+      const date = String(item.meeting_date || "").trim();
+      if (!generated && !link) return null;
+
+      return {
+        title: String(item.title || "Client meeting").trim(),
+        meeting_date: date,
+        transcript_link: link,
+        generated_text: generated || `Transcript reference: ${link}`,
+      };
+    })
+    .filter((row): row is {
+      title: string;
+      meeting_date: string;
+      transcript_link: string;
+      generated_text: string;
+    } => row !== null);
+}
+
+function getTaskSource(task: Record<string, unknown>): "activecollab" | "control_tower" {
+  return task.activecollab_task_id ? "activecollab" : "control_tower";
+}
+
+function buildProjectBreakdown(
+  projects: Array<Record<string, unknown>>,
+  allTasks: Array<Record<string, unknown>>,
+  recentComments: Array<{
+    text: string;
+    task_id: string | null;
+    task_title: string | null;
+    task_due_date: string | null;
+    project_name: string | null;
+  }>,
+  allProjectMeetings: MeetingSignal[],
+  taskById: Map<string, Record<string, unknown>>,
+  now: Date,
+  fourteenDaysAgo: Date,
+  sevenDaysAhead: Date,
+  formatTask: (task: Record<string, unknown>) => Record<string, unknown>,
+) {
+  const buildForTasks = (
+    projectId: string,
+    projectName: string,
+    meta: { activecollab_linked?: boolean; control_tower_linked?: boolean },
+    projectTasks: Array<Record<string, unknown>>,
+  ) => {
+    const open = projectTasks.filter((t) => !isTaskDone(t.status as string));
+    const overdue = open.filter((t) => {
+      if (!t.due_date) return false;
+      return new Date(t.due_date as string) < now;
+    });
+    const approaching = open.filter((t) => {
+      if (!t.due_date) return false;
+      const due = new Date(t.due_date as string);
+      return due >= now && due <= sevenDaysAhead;
+    });
+    const stale = open.filter((t) => {
+      const updated = new Date((t.updated_at || t.created_at) as string);
+      return updated < fourteenDaysAgo;
+    });
+    const comments = recentComments.filter((c) => {
+      if (!c.task_id) return false;
+      const task = taskById.get(c.task_id);
+      return task?.project_id === projectId;
+    });
+    const meetings = allProjectMeetings.filter((m) => m.project_id === projectId);
+    const concerns: string[] = [];
+    if (overdue.length > 0) {
+      concerns.push(`${overdue.length} overdue task(s) — e.g. "${String(overdue[0].title || "Task")}"`);
+    }
+    if (approaching.length > 0) {
+      concerns.push(`${approaching.length} deadline(s) within 7 days`);
+    }
+    if (stale.length > 0) {
+      concerns.push(`${stale.length} stale task(s) with no updates in 14+ days`);
+    }
+    const negativeComment = comments.find((c) =>
+      flagNegativeComments([c.text]).length > 0,
+    );
+    if (negativeComment) {
+      concerns.push(`Negative comment on "${negativeComment.task_title || "task"}"`);
+    }
+    if (meetings.length === 0 && projectTasks.length > 0) {
+      concerns.push("No recent project-mapped meeting transcripts");
+    }
+
+    return {
+      project_id: projectId,
+      project_name: projectName,
+      activecollab_linked: meta.activecollab_linked ?? false,
+      control_tower_linked: meta.control_tower_linked ?? false,
+      open_tasks: open.length,
+      overdue_count: overdue.length,
+      approaching_deadline_count: approaching.length,
+      stale_count: stale.length,
+      overdue_tasks: overdue.slice(0, 5).map(formatTask),
+      approaching_deadlines: approaching.slice(0, 5).map(formatTask),
+      recent_comments: comments.slice(0, 5).map((c) => ({
+        text: c.text.slice(0, 200),
+        task_title: c.task_title,
+        task_due_date: c.task_due_date,
+      })),
+      meetings: meetings.slice(0, 3).map((m) => ({
+        subject: m.subject,
+        date: m.date,
+      })),
+      concerns,
+    };
+  };
+
+  const breakdown = (projects || []).map((project) => {
+    const projectId = String(project.id);
+    const projectTasks = allTasks.filter((t) => t.project_id === projectId);
+    return buildForTasks(projectId, String(project.name), {
+      activecollab_linked: Boolean(project.activecollab_project_id),
+      control_tower_linked: Boolean(project.control_tower_project_id),
+    }, projectTasks);
+  });
+
+  const projectIdSet = new Set((projects || []).map((p) => String(p.id)));
+  const unassignedTasks = allTasks.filter(
+    (t) => !t.project_id || !projectIdSet.has(String(t.project_id)),
+  );
+  if (unassignedTasks.length > 0) {
+    breakdown.push(
+      buildForTasks("unassigned", "Client-level / unassigned tasks", {}, unassignedTasks),
+    );
+  }
+
+  return breakdown;
+}
+
 async function collectSignals(supabase: ReturnType<typeof createClient>, clientId: string) {
   const { data: client, error: clientError } = await supabase
     .from("clients")
@@ -126,16 +307,28 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
 
   const { data: projects } = await supabase
     .from("projects")
-    .select("id, name, status")
+    .select("id, name, status, control_tower_project_id, activecollab_project_id, retention_meeting_transcripts, retention_meeting_signal_text")
     .eq("client_id", clientId);
 
   const projectIds = (projects || []).map((p) => p.id);
+  const projectNameById = new Map((projects || []).map((p) => [p.id, p.name]));
+
+  const formatTask = (task: Record<string, unknown>) => ({
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+    due_date: task.due_date,
+    project_id: task.project_id,
+    project_name: projectNameById.get(task.project_id as string) || null,
+    source: getTaskSource(task),
+    activecollab_task_id: task.activecollab_task_id || null,
+  });
 
   let tasks: Array<Record<string, unknown>> = [];
   if (projectIds.length > 0) {
     const { data: projectTasks } = await supabase
       .from("project_tasks")
-      .select("id, title, status, priority, due_date, updated_at, created_at, project_id, brand_id")
+      .select("id, title, status, priority, due_date, updated_at, created_at, project_id, brand_id, activecollab_task_id")
       .in("project_id", projectIds);
 
     tasks = projectTasks || [];
@@ -154,6 +347,8 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
 
   const now = new Date();
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const taskById = new Map(allTasks.map((t) => [t.id as string, t]));
 
   const openTasks = allTasks.filter((t) => !isTaskDone(t.status as string));
   const overdueTasks = openTasks.filter((t) => {
@@ -166,114 +361,148 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
     return updated < fourteenDaysAgo;
   });
 
+  const approachingDeadlineTasks = openTasks.filter((t) => {
+    if (!t.due_date) return false;
+    const due = new Date(t.due_date as string);
+    return due >= now && due <= sevenDaysAhead;
+  });
+
   const taskIds = allTasks.map((t) => t.id as string);
-  let recentComments: Array<{ text: string; created_at: string | null; author: string | null }> = [];
+  let recentComments: Array<{
+    text: string;
+    created_at: string | null;
+    author: string | null;
+    task_id: string | null;
+    task_title: string | null;
+    task_due_date: string | null;
+    project_name: string | null;
+  }> = [];
 
   if (taskIds.length > 0) {
     const { data: comments } = await supabase
       .from("project_task_comments")
-      .select("comment, comment_body, created_at, created_by_name, is_deleted")
+      .select("comment, comment_body, created_at, created_by_name, is_deleted, task_id")
       .in("task_id", taskIds)
       .eq("is_deleted", false)
       .order("created_at", { ascending: false })
       .limit(15);
 
-    recentComments = (comments || []).map((c) => ({
-      text: (c.comment_body || c.comment || "").trim(),
-      created_at: c.created_at,
-      author: c.created_by_name,
-    })).filter((c) => c.text.length > 0);
+    recentComments = (comments || []).map((c) => {
+      const task = c.task_id ? taskById.get(c.task_id) : undefined;
+      return {
+        text: (c.comment_body || c.comment || "").trim(),
+        created_at: c.created_at,
+        author: c.created_by_name,
+        task_id: c.task_id,
+        task_title: task ? String(task.title || "") : null,
+        task_due_date: task?.due_date ? String(task.due_date) : null,
+        project_name: task?.project_id
+          ? projectNameById.get(task.project_id as string) || null
+          : null,
+      };
+    }).filter((c) => c.text.length > 0);
   }
 
   const negativeFlags = flagNegativeComments(recentComments.map((c) => c.text));
 
-  let daysSinceLastMeeting: number | null = null;
-  let lastMeetingDate: string | null = null;
+  let daysSinceLastTouch: number | null = null;
+  let lastTouchDate: string | null = null;
+  let projectMeetings: MeetingSignal[] = [];
 
   if (projectIds.length > 0) {
     const { data: meetings } = await supabase
       .from("project_meetings")
-      .select("start_time")
+      .select("project_id, meeting_title, start_time, meeting_description, meeting_data, meeting_type")
       .in("project_id", projectIds)
       .order("start_time", { ascending: false })
-      .limit(1);
+      .limit(8);
 
-    if (meetings && meetings.length > 0 && meetings[0].start_time) {
-      lastMeetingDate = meetings[0].start_time;
-      const meetingDate = new Date(meetings[0].start_time);
-      daysSinceLastMeeting = Math.floor((now.getTime() - meetingDate.getTime()) / (1000 * 60 * 60 * 24));
-    }
+    projectMeetings = (meetings || []).map((meeting) => ({
+      channel: String(meeting.meeting_type || "zoom"),
+      subject: String(meeting.meeting_title || "Client meeting"),
+      content_excerpt: extractTranscriptText(meeting).slice(0, 500),
+      date: String(meeting.start_time || ""),
+      source: "project_meeting" as const,
+      project_id: String(meeting.project_id || ""),
+      project_name: projectNameById.get(String(meeting.project_id || "")) || undefined,
+    })).filter((meeting) => meeting.date);
   }
 
-  const brandIds = [...new Set(
-    allTasks.map((t) => t.brand_id as string).filter(Boolean),
-  )];
+  const projectRetentionMeetings = (projects || []).flatMap((project) => {
+    const rows = parseProjectRetentionMeetings(project.retention_meeting_transcripts);
+    return rows.map((row) => ({
+      channel: "zoom",
+      subject: `${row.title} (${project.name})`,
+      content_excerpt: row.generated_text.slice(0, 500),
+      date: row.meeting_date || "",
+      source: "project_retention" as const,
+      transcript_link: row.transcript_link,
+      project_id: project.id,
+      project_name: project.name,
+    }));
+  });
 
-  let trafficSignal: Record<string, unknown> = { available: false };
+  const allProjectMeetings = [...projectRetentionMeetings, ...projectMeetings]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 10);
 
-  if (brandIds.length > 0) {
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const retentionMeetingSignalText = (projects || [])
+    .map((project) => {
+      const signal = String(project.retention_meeting_signal_text || "").trim();
+      if (!signal) return null;
+      return `Project: ${project.name}\n${signal}`;
+    })
+    .filter(Boolean)
+    .join("\n\n");
 
-    const { data: analytics } = await supabase
-      .from("brand_analytics_data")
-      .select("brand_id, metrics, date_range_start, date_range_end")
-      .in("brand_id", brandIds)
-      .gte("date_range_end", twoWeeksAgo.toISOString().split("T")[0])
-      .order("date_range_end", { ascending: false });
+  const touchDates = [
+    ...allProjectMeetings.map((m) => m.date),
+  ].filter(Boolean);
 
-    if (analytics && analytics.length > 0) {
-      const extractSessions = (metrics: Record<string, unknown> | null): number => {
-        if (!metrics) return 0;
-        const m = metrics as Record<string, number>;
-        return m.sessions || m.totalSessions || m.users || m.pageviews || 0;
-      };
-
-      const currentPeriod = analytics.filter((a) =>
-        new Date(a.date_range_end) >= oneWeekAgo,
-      );
-      const previousPeriod = analytics.filter((a) =>
-        new Date(a.date_range_end) < oneWeekAgo &&
-        new Date(a.date_range_end) >= twoWeeksAgo,
-      );
-
-      const currentSessions = currentPeriod.reduce(
-        (sum, a) => sum + extractSessions(a.metrics as Record<string, unknown>),
-        0,
-      );
-      const previousSessions = previousPeriod.reduce(
-        (sum, a) => sum + extractSessions(a.metrics as Record<string, unknown>),
-        0,
-      );
-
-      if (previousSessions > 0) {
-        const wowChange = ((currentSessions - previousSessions) / previousSessions) * 100;
-        trafficSignal = {
-          available: true,
-          wow_change_pct: Math.round(wowChange * 10) / 10,
-          current_sessions: currentSessions,
-          previous_sessions: previousSessions,
-        };
-      }
-    }
+  if (touchDates.length > 0) {
+    const latest = Math.max(...touchDates.map((d) => new Date(d).getTime()));
+    lastTouchDate = new Date(latest).toISOString();
+    daysSinceLastTouch = Math.floor((now.getTime() - latest) / (1000 * 60 * 60 * 24));
   }
+
+  const meetingTexts = [
+    ...allProjectMeetings.map((m) => m.content_excerpt),
+    ...(retentionMeetingSignalText ? [retentionMeetingSignalText] : []),
+  ].filter((text) => text.length > 0);
+  const meetingFlags = flagNegativeComments(meetingTexts);
 
   let heuristicScore = client.satisfaction_score ?? 85;
   heuristicScore -= Math.min(overdueTasks.length * 5, 25);
   heuristicScore -= Math.min(staleTasks.length * 10, 20);
-  if (daysSinceLastMeeting !== null && daysSinceLastMeeting > 21) {
+  if (daysSinceLastTouch !== null && daysSinceLastTouch > 21) {
     heuristicScore -= 15;
   }
   if (negativeFlags.length > 0) {
     heuristicScore -= Math.min(negativeFlags.length * 5, 15);
   }
-  const traffic = trafficSignal as { available?: boolean; wow_change_pct?: number };
-  if (traffic.available && traffic.wow_change_pct !== undefined && traffic.wow_change_pct < -25) {
-    heuristicScore -= 20;
+  if (meetingFlags.length > 0) {
+    heuristicScore -= Math.min(meetingFlags.length * 5, 15);
+  }
+  if (approachingDeadlineTasks.length >= 3) {
+    heuristicScore -= 5;
   }
   heuristicScore = Math.max(0, Math.min(100, heuristicScore));
 
   const primaryProjectId = projectIds[0] || null;
+  const activecollabTaskCount = allTasks.filter((t) => t.activecollab_task_id).length;
+  const controlTowerTaskCount = allTasks.length - activecollabTaskCount;
+
+  const projectBreakdown = buildProjectBreakdown(
+    projects || [],
+    allTasks,
+    recentComments,
+    allProjectMeetings,
+    taskById,
+    now,
+    fourteenDaysAgo,
+    sevenDaysAhead,
+    formatTask,
+  );
 
   return {
     client,
@@ -289,28 +518,65 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
       project_count: projectIds.length,
       primary_project_id: primaryProjectId,
       open_task_count: openTasks.length,
+      activecollab_task_count: activecollabTaskCount,
+      control_tower_task_count: controlTowerTaskCount,
+      project_breakdown: projectBreakdown,
+      delivery: {
+        activecollab_task_count: activecollabTaskCount,
+        control_tower_task_count: controlTowerTaskCount,
+        overdue_tasks: {
+          count: overdueTasks.length,
+          tasks: overdueTasks.slice(0, 5).map(formatTask),
+        },
+        approaching_deadlines: {
+          count: approachingDeadlineTasks.length,
+          tasks: approachingDeadlineTasks.slice(0, 5).map(formatTask),
+        },
+        stale_tasks: {
+          count: staleTasks.length,
+          tasks: staleTasks.slice(0, 3).map((t) => ({
+            ...formatTask(t),
+            last_updated: t.updated_at || t.created_at,
+          })),
+        },
+      },
+      control_tower_delivery: {
+        overdue_tasks: {
+          count: overdueTasks.length,
+          tasks: overdueTasks.slice(0, 5).map(formatTask),
+        },
+        approaching_deadlines: {
+          count: approachingDeadlineTasks.length,
+          tasks: approachingDeadlineTasks.slice(0, 5).map(formatTask),
+        },
+        stale_tasks: {
+          count: staleTasks.length,
+          tasks: staleTasks.slice(0, 3).map((t) => ({
+            ...formatTask(t),
+            last_updated: t.updated_at || t.created_at,
+          })),
+        },
+      },
       overdue_tasks: {
         count: overdueTasks.length,
-        tasks: overdueTasks.slice(0, 5).map((t) => ({
-          title: t.title,
-          due_date: t.due_date,
-          priority: t.priority,
-        })),
+        tasks: overdueTasks.slice(0, 5).map(formatTask),
       },
       stale_tasks: {
         count: staleTasks.length,
         tasks: staleTasks.slice(0, 3).map((t) => ({
-          title: t.title,
+          ...formatTask(t),
           last_updated: t.updated_at || t.created_at,
         })),
       },
       recent_comments: recentComments.slice(0, 10),
       negative_comment_flags: negativeFlags,
-      meeting: {
-        days_since_last: daysSinceLastMeeting,
-        last_meeting_date: lastMeetingDate,
+      meetings: {
+        days_since_last_touch: daysSinceLastTouch,
+        last_touch_date: lastTouchDate,
+        project_meetings: allProjectMeetings,
+        retention_meeting_signal_text: retentionMeetingSignalText || null,
+        negative_flags: meetingFlags,
       },
-      traffic: trafficSignal,
     },
     heuristicScore,
   };
@@ -346,15 +612,48 @@ function buildFallbackAnalysis(
   const overdue = (signals.overdue_tasks as { count?: number })?.count ?? 0;
   const stale = (signals.stale_tasks as { count?: number })?.count ?? 0;
   const negativeFlags = (signals.negative_comment_flags as string[]) ?? [];
-  const traffic = signals.traffic as { wow_change_pct?: number; available?: boolean };
-  const meetingDays = (signals.meeting as { days_since_last?: number | null })?.days_since_last;
+  const comms = signals.meetings as {
+    days_since_last_touch?: number | null;
+    negative_flags?: string[];
+  } | undefined;
+  const legacyComms = signals.communications as {
+    days_since_last_touch?: number | null;
+    negative_flags?: string[];
+  } | undefined;
+  const meetingDays = comms?.days_since_last_touch ?? legacyComms?.days_since_last_touch ??
+    (signals.meeting as { days_since_last?: number | null })?.days_since_last;
+  const meetingFlags = comms?.negative_flags ?? legacyComms?.negative_flags ??
+    (signals.meeting as { transcript_negative_flags?: string[] })?.transcript_negative_flags ?? [];
+  const approaching = (signals.delivery as {
+    approaching_deadlines?: { count?: number };
+  } | undefined)?.approaching_deadlines?.count ??
+    (signals.control_tower_delivery as {
+      approaching_deadlines?: { count?: number };
+    } | undefined)?.approaching_deadlines?.count ?? 0;
+  const projectBreakdown = (signals.project_breakdown as Array<{
+    project_name?: string;
+    concerns?: string[];
+  }>) || [];
 
   const score = heuristicScore;
   const churnProb = normalizeChurnProbability(null, score);
   const riskBand = computeRiskBand(score, churnProb);
 
   const rootCauses: RootCause[] = [];
-  if (overdue > 0) {
+  for (const project of projectBreakdown) {
+    for (const concern of project.concerns || []) {
+      rootCauses.push({
+        cause: `${project.project_name || "Project"}: delivery concern`,
+        evidence: concern,
+        confidence: 0.8,
+        severity: concern.toLowerCase().includes("overdue") || concern.toLowerCase().includes("negative")
+          ? "high"
+          : "medium",
+      });
+    }
+  }
+
+  if (rootCauses.length === 0 && overdue > 0) {
     rootCauses.push({
       cause: "Overdue deliverables",
       evidence: `${overdue} open task(s) past due date`,
@@ -378,12 +677,20 @@ function buildFallbackAnalysis(
       severity: "high",
     });
   }
-  if (traffic?.available && (traffic.wow_change_pct ?? 0) < -25) {
+  if (meetingFlags.length > 0) {
     rootCauses.push({
-      cause: "Traffic decline",
-      evidence: `Week-over-week sessions down ${Math.abs(traffic.wow_change_pct ?? 0)}%`,
-      confidence: 0.85,
+      cause: "Negative sentiment in project meeting transcripts",
+      evidence: meetingFlags[0],
+      confidence: 0.8,
       severity: "high",
+    });
+  }
+  if (approaching >= 3) {
+    rootCauses.push({
+      cause: "Upcoming deadline pressure",
+      evidence: `${approaching} tasks due within 7 days`,
+      confidence: 0.75,
+      severity: "medium",
     });
   }
   if (meetingDays != null && meetingDays > 21) {
@@ -427,9 +734,7 @@ function buildFallbackAnalysis(
     churn_window_days: riskBand === "immediate" ? 30 : riskBand === "critical" ? 45 : 90,
     risk_band: riskBand,
     headline: `${client.name}: ${riskBand} account health (${score}/100)`,
-    explanation: `Heuristic assessment: ${overdue} overdue, ${stale} stale, ${negativeFlags.length} negative comment flag(s)${
-      traffic?.available ? `, traffic ${traffic.wow_change_pct}% WoW` : ""
-    }.`,
+    explanation: `Heuristic assessment: ${overdue} overdue, ${stale} stale, ${approaching} approaching deadlines, ${negativeFlags.length} negative comment flag(s), ${meetingFlags.length} meeting concern(s).`,
     root_causes: rootCauses,
     recovery_plan: recoveryPlan,
     recommended_actions: recommendedActions,
@@ -454,7 +759,9 @@ function normalizeAnalysis(
     root_causes: Array.isArray(raw.root_causes) ? raw.root_causes as RootCause[] : [],
     recovery_plan: Array.isArray(raw.recovery_plan) ? raw.recovery_plan as RecoveryStep[] : [],
     recommended_actions: Array.isArray(raw.recommended_actions)
-      ? raw.recommended_actions as RecommendedAction[]
+      ? (raw.recommended_actions as RecommendedAction[]).filter((action) =>
+        action.type === "create_task" || action.type === "draft_email"
+      )
       : [],
   };
 }
@@ -548,7 +855,8 @@ ${JSON.stringify(signals, null, 2)}
 
 Analyze this client and return the structured JSON assessment.
 IMPORTANT: churn_probability must be a decimal between 0.0 and 1.0 (e.g. 0.84 not 84).
-risk_band must be exactly one of: healthy, stable, watch, critical, immediate.`;
+risk_band must be exactly one of: healthy, stable, watch, critical, immediate.
+When project_breakdown is present, tie root_causes and recovery_plan to specific projects where possible.`;
 
   try {
     const analysis = await callGemini(geminiKey, userPrompt, heuristicScore);
@@ -631,15 +939,15 @@ serve(async (req) => {
     } else if (body.client_ids && body.client_ids.length > 0) {
       clientIds = body.client_ids;
     } else {
-      const { data: activeClients, error: clientsError } = await supabase
+      const { data: allClients, error: clientsError } = await supabase
         .from("clients")
         .select("id")
-        .eq("status", "active");
+        .order("name");
 
       if (clientsError) {
         throw new Error(`Failed to fetch clients: ${clientsError.message}`);
       }
-      clientIds = (activeClients || []).map((c) => c.id);
+      clientIds = (allClients || []).map((c) => c.id);
     }
 
     if (clientIds.length === 0) {

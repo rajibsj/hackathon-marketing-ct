@@ -15,7 +15,7 @@ import {
   BreadcrumbSeparator,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
-import { ArrowLeft, Calendar, Clock, Tag, Edit, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Tag, Edit, AlertCircle, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { ProjectTask, TaskCategory, useUpdateProjectTask } from "@/hooks/useProjectTasks";
 import { TaskForm } from "@/components/tasks/TaskForm";
@@ -23,19 +23,10 @@ import { TaskCommentsSection } from "@/components/tasks/TaskCommentsSection";
 import { InlineAssigneeSelect } from "@/components/tasks/InlineAssigneeSelect";
 import { InlinePrioritySelect } from "@/components/tasks/InlinePrioritySelect";
 import { UrlRenderer } from "@/components/tasks/UrlRenderer";
+import { TaskStatusActions, TaskStatusBadge, TASK_STATUS_COLORS } from "@/components/tasks/TaskStatusActions";
 import { useState } from "react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-const getStatusColor = (status: ProjectTask['status']) => {
-  switch (status) {
-    case 'todo': return 'bg-slate-100 text-slate-800 hover:bg-slate-200';
-    case 'in_progress': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
-    case 'review': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
-    case 'completed': return 'bg-green-100 text-green-800 hover:bg-green-200';
-    case 'blocked': return 'bg-red-100 text-red-800 hover:bg-red-200';
-    default: return 'bg-slate-100 text-slate-800';
-  }
-};
+const getStatusColor = (status: ProjectTask['status']) => TASK_STATUS_COLORS[status] ?? TASK_STATUS_COLORS.todo;
 
 const getCategoryColor = (category: TaskCategory | undefined) => {
   switch (category) {
@@ -65,13 +56,13 @@ const CATEGORY_LABELS: Record<TaskCategory, string> = {
   other: 'Other'
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS = {
   todo: 'To Do',
   in_progress: 'In Progress',
   review: 'In Review',
   completed: 'Completed',
-  blocked: 'Blocked'
-};
+  blocked: 'Blocked',
+} as const;
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
@@ -238,29 +229,7 @@ export default function TaskDetailPage() {
           Back
         </Button>
         <div className="flex items-center gap-2">
-          {/* Status Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Badge 
-                variant="outline" 
-                className={`${getStatusColor(task.status)} cursor-pointer text-sm px-3 py-1.5 flex items-center gap-1`}
-              >
-                {STATUS_LABELS[task.status]}
-                <ChevronDown className="h-3 w-3" />
-              </Badge>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <DropdownMenuItem 
-                  key={value} 
-                  onClick={() => handleStatusChange(value as ProjectTask['status'])}
-                >
-                  {label}
-                  {task.status === value && <span className="ml-auto text-primary">✓</span>}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <TaskStatusBadge status={task.status} />
           <Button onClick={() => setShowEditForm(true)} className="gap-2">
             <Edit className="h-4 w-4" />
             Edit Task
@@ -275,7 +244,21 @@ export default function TaskDetailPage() {
           <Card>
             <CardHeader className="pb-4">
               <div className="space-y-3">
-                <CardTitle className="text-2xl">{task.title}</CardTitle>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <CardTitle className="text-2xl flex-1 min-w-0">{task.title}</CardTitle>
+                  <Badge
+                    variant="outline"
+                    className={`${getStatusColor(task.status)} shrink-0`}
+                  >
+                    {STATUS_LABELS[task.status]}
+                  </Badge>
+                </div>
+                <TaskStatusActions
+                  status={task.status}
+                  onStatusChange={handleStatusChange}
+                  isUpdating={updateTask.isPending}
+                  layout="buttons"
+                />
                 {/* Project and Client Info */}
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   {task.projects && (
@@ -352,10 +335,19 @@ export default function TaskDetailPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                Details
+                Status & Details
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <TaskStatusActions
+                status={task.status}
+                onStatusChange={handleStatusChange}
+                isUpdating={updateTask.isPending}
+                layout="select"
+              />
+
+              <Separator />
+
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Calendar className="h-4 w-4" />

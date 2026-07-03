@@ -1,6 +1,226 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+export const RECOVERY_TASK_SOURCE = "client-retention-copilot";
+export const RECOVERY_TITLE_PREFIX = "[Recovery]";
+
+export type RecoveryTaskFilter = "pending" | "ongoing" | "completed" | "all";
+
+export interface RecoveryTask {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  client_id: string | null;
+  created_at: string;
+  completed_at: string | null;
+  client?: { id: string; name: string; company: string | null } | null;
+}
+
+export interface RecoveryTaskClientSummary {
+  pending: number;
+  ongoing: number;
+  completed: number;
+  total: number;
+}
+
+function statusesForFilter(filter: RecoveryTaskFilter): string[] | null {
+  switch (filter) {
+    case "pending":
+      return ["todo"];
+    case "ongoing":
+      return ["in_progress", "review", "blocked"];
+    case "completed":
+      return ["completed"];
+    default:
+      return null;
+  }
+}
+
+export function formatRecoveryTitle(title: string) {
+  const trimmed = title.trim();
+  if (trimmed.startsWith(RECOVERY_TITLE_PREFIX)) return trimmed;
+  return `${RECOVERY_TITLE_PREFIX} ${trimmed}`;
+}
+
+export function buildRecoveryDescription(description?: string) {
+  const base = description?.trim() || "AI-generated recovery action";
+  if (base.includes(RECOVERY_TASK_SOURCE)) return base;
+  return `${base}\n\n---\nSource: ${RECOVERY_TASK_SOURCE}`;
+}
+
+export function isRecoveryTask(task: { description?: string | null; title?: string | null }) {
+  return (
+    task.description?.includes(RECOVERY_TASK_SOURCE) ||
+    task.title?.startsWith(RECOVERY_TITLE_PREFIX)
+  );
+}
+
+function mapRecoveryTask(row: Record<string, unknown>): RecoveryTask {
+  const client = row.client as RecoveryTask["client"];
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    description: row.description as string | null,
+    status: row.status as string,
+    priority: row.priority as string,
+    due_date: row.due_date as string | null,
+    client_id: row.client_id as string | null,
+    created_at: row.created_at as string,
+    completed_at: row.completed_at as string | null,
+    client: Array.isArray(client) ? client[0] : client,
+  };
+}
+
+async function fetchRecoveryTasks(clientId?: string, filter: RecoveryTaskFilter = "all") {
+  let query = supabase
+    .from("project_tasks")
+    .select(
+      "id, title, description, status, priority, due_date, client_id, created_at, completed_at, client:clients(id, name, company)",
+    )
+    .ilike("description", `%${RECOVERY_TASK_SOURCE}%`)
+    .order("created_at", { ascending: false });
+
+  if (clientId) {
+    query = query.eq("client_id", clientId);
+  }
+
+  const statuses = statusesForFilter(filter);
+  if (statuses) {
+    query = query.in("status", statuses);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data || [])
+    .map((row) => mapRecoveryTask(row as Record<string, unknown>))
+    .filter(isRecoveryTask);
+}
+
+export function useRecoveryTasks(
+  clientId?: string,
+  filter: RecoveryTaskFilter = "all",
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["recovery-tasks", clientId ?? "all", filter],
+    queryFn: () => fetchRecoveryTasks(clientId, filter),
+    staleTime: 5000,
+    enabled,
+  });
+}
+
+function buildRecoveryMaps(tasks: RecoveryTask[]) {
+  const byClient = new Map<string, RecoveryTask[]>();
+  const summary = new Map<string, RecoveryTaskClientSummary>();
+
+  for (const task of tasks) {
+    if (!task.client_id) continue;
+
+    const list = byClient.get(task.client_id) ?? [];
+    list.push(task);
+    byClient.set(task.client_id, list);
+
+    const current = summary.get(task.client_id) ?? {
+      pending: 0,
+      ongoing: 0,
+      completed: 0,
+      total: 0,
+    };
+
+    current.total += 1;
+    if (task.status === "completed") current.completed += 1;
+    else if (task.status === "todo") current.pending += 1;
+    else current.ongoing += 1;
+
+    summary.set(task.client_id, current);
+  }
+
+  return { byClient, summary };
+}
+
+/** Single portfolio-wide fetch — use on Retention Copilot cards to avoid N+1 queries. */
+export function useRecoveryTasksPortfolio() {
+  const query = useRecoveryTasks(undefined, "all");
+
+  const { byClient, summary } = useMemo(
+    () => buildRecoveryMaps(query.data ?? []),
+    [query.data],
+  );
+
+  return {
+    ...query,
+    byClient,
+    summary,
+  };
+}
+
+export function useRecoveryTaskSummary() {
+  const { summary, isLoading, isError, error, refetch } = useRecoveryTasksPortfolio();
+
+  return {
+    data: summary,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  };
+}
+
+export function useCompleteRecoveryTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const { data, error } = await (supabase as any).rpc("update_project_task", {
+        p_task_id: taskId,
+        p_updates: { status: "completed", completed_at: new Date().toISOString() },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-project-tasks"] });
+      toast.success("Recovery task marked complete");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to complete recovery task");
+    },
+  });
+}
+
+export function useStartRecoveryTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (taskId: string) => {
+      const { data, error } = await (supabase as any).rpc("update_project_task", {
+        p_task_id: taskId,
+        p_updates: { status: "in_progress", completed_at: null },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["all-project-tasks"] });
+      toast.success("Recovery task started");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to start recovery task");
+    },
+  });
+}
 
 export type RiskBand = "healthy" | "stable" | "watch" | "critical" | "immediate";
 
@@ -20,13 +240,12 @@ export interface RecoveryStep {
 }
 
 export interface RecommendedAction {
-  type: "create_task" | "draft_email" | "slack_notify";
+  type: "create_task" | "draft_email";
   title?: string;
   description?: string;
   priority?: string;
   subject?: string;
   body?: string;
-  message?: string;
 }
 
 export interface ClientHealthSnapshot {
@@ -81,7 +300,6 @@ export function useClientHealth() {
       const { data: clients, error: clientsError } = await supabase
         .from("clients")
         .select("id, name, company, status, email, health_score, churn_risk_band, last_health_analysis_at")
-        .eq("status", "active")
         .order("name");
 
       if (clientsError) {
@@ -271,8 +489,8 @@ export function useCreateRecoveryTasks() {
       const inserts = taskActions.map((action) => ({
         client_id: clientId,
         project_id: targetProjectId || undefined,
-        title: action.title || "Recovery action",
-        description: action.description || "",
+        title: formatRecoveryTitle(action.title || "Recovery action"),
+        description: buildRecoveryDescription(action.description),
         priority: (action.priority || "high") as "low" | "medium" | "high" | "urgent",
         status: "todo" as const,
         category: "clients" as const,
@@ -287,9 +505,12 @@ export function useCreateRecoveryTasks() {
       if (error) throw error;
       return data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["all-project-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recovery-tasks", variables.clientId] });
       toast.success(`Created ${data?.length ?? 0} recovery task${(data?.length ?? 0) === 1 ? "" : "s"}`);
     },
     onError: (err: Error) => {

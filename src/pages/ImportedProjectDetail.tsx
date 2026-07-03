@@ -27,9 +27,8 @@ import { MyAgentsPanel } from '@/components/agents/MyAgentsPanel';
 import { getProjectKnowledgeUrl } from '@/lib/projectSlugUtils';
 import { useProjectTasks, ProjectTask } from '@/hooks/useProjectTasks';
 import { useProjectTaskComments } from '@/hooks/useProjectTaskComments';
-import { useProjectMeetings } from '@/hooks/useProjectMeetings';
-import { MapMeetingsDialog } from '@/components/projects/MapMeetingsDialog';
-import { Meeting } from '@/lib/controlTowerApi';
+import { ProjectRetentionMeetings } from '@/components/projects/ProjectRetentionMeetings';
+import { ProjectClientPortfolioPanel } from '@/components/projects/ProjectClientPortfolioPanel';
 import { TaskForm } from '@/components/tasks/TaskForm';
 import ProjectKnowledgeBase from './ProjectKnowledgeBase';
 
@@ -42,15 +41,17 @@ const ImportedProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [mapMeetingsOpen, setMapMeetingsOpen] = useState(false);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [taskFormTask, setTaskFormTask] = useState<ProjectTask | null>(null);
   const tasksPerPage = 10;
 
   const { projects: allProjects } = useProjects({ limit: 1000 });
+  const { projects: clientProjects, loading: clientProjectsLoading } = useProjects({
+    client_id: project?.client_id,
+    limit: 100,
+  });
   const { data: tasks = [], isLoading: tasksLoading, refetch: refetchTasks } = useProjectTasks(projectId || undefined);
   const { data: comments = [], isLoading: loadingComments } = useProjectTaskComments(selectedTask?.id);
-  const { meetings, isLoading: meetingsLoading, mapMeeting, unmapMeeting } = useProjectMeetings(projectId || undefined);
 
   // Pagination logic
   const totalPages = Math.ceil(tasks.length / tasksPerPage);
@@ -120,7 +121,10 @@ const ImportedProjectDetail = () => {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .select('*')
+        .select(`
+          *,
+          client:clients(id, name, company, slug, status)
+        `)
         .eq('id', projectId)
         .single();
 
@@ -168,28 +172,6 @@ const ImportedProjectDetail = () => {
   const handleCloseTaskForm = () => {
     setIsTaskFormOpen(false);
     setTaskFormTask(null);
-  };
-
-  const handleMapMeeting = async (meeting: Meeting) => {
-    await mapMeeting.mutateAsync({
-      meeting_id: meeting.id,
-      meeting_title: meeting.title,
-      meeting_description: meeting.description,
-      meeting_type: meeting.meeting_type,
-      start_time: meeting.start_time,
-      end_time: meeting.end_time,
-      location: meeting.location,
-      attendees: meeting.attendees,
-      organizer: meeting.organizer,
-      meeting_link: meeting.meeting_link,
-      meeting_data: meeting,
-    });
-  };
-
-  const handleUnmapMeeting = async (meetingId: string) => {
-    if (confirm('Are you sure you want to unmap this meeting?')) {
-      await unmapMeeting.mutateAsync(meetingId);
-    }
   };
 
   if (loading) {
@@ -269,6 +251,17 @@ const ImportedProjectDetail = () => {
           </div>
         </div>
       </div>
+
+      {project.client && (
+        <div className="mb-8">
+          <ProjectClientPortfolioPanel
+            client={project.client}
+            projects={clientProjects}
+            currentProjectId={project.id}
+            loading={clientProjectsLoading}
+          />
+        </div>
+      )}
 
       {/* Tabs for Different Data Views */}
       <Tabs defaultValue="overview" className="w-full">
@@ -610,122 +603,25 @@ const ImportedProjectDetail = () => {
 
           {/* Meetings Tab */}
           <TabsContent value="meetings" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-4 duration-300">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-3xl font-display font-bold tracking-tight">Project Meetings</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Meetings mapped from Control Tower and synced to knowledge base
-                  </p>
-                </div>
-                <Button onClick={() => setMapMeetingsOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Map Meeting
-                </Button>
-              </div>
-
-              {meetingsLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Loading meetings...</span>
-                </div>
-              ) : meetings.length === 0 ? (
-                <Card className="border-2 border-dashed border-border/50 bg-muted/20">
-                  <CardContent className="py-16 text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
-                      <Calendar className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-xl font-display font-bold mb-2">No Meetings Mapped</h3>
-                    <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-                      Map meetings from Control Tower to track project discussions and add them to the knowledge base.
-                    </p>
-                    <Button onClick={() => setMapMeetingsOpen(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Map First Meeting
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-1">
-                  {meetings.map((meeting) => (
-                    <Card key={meeting.id} className="border border-border/50 shadow-md hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <CardTitle className="text-lg">{meeting.meeting_title}</CardTitle>
-                              {meeting.meeting_type && (
-                                <Badge variant="outline" className="text-xs">
-                                  {meeting.meeting_type}
-                                </Badge>
-                              )}
-                            </div>
-                            {meeting.meeting_description && (
-                              <CardDescription className="line-clamp-2">
-                                {meeting.meeting_description}
-                              </CardDescription>
-                            )}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleUnmapMeeting(meeting.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-wrap gap-4 text-sm">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
-                            <span>{format(new Date(meeting.start_time), 'MMM d, yyyy')}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Clock className="h-4 w-4" />
-                            <span>
-                              {format(new Date(meeting.start_time), 'HH:mm')} - {format(new Date(meeting.end_time), 'HH:mm')}
-                            </span>
-                          </div>
-                          {meeting.location && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <MapPin className="h-4 w-4" />
-                              <span>{meeting.location}</span>
-                            </div>
-                          )}
-                          {meeting.organizer && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <User className="h-4 w-4" />
-                              <span>{meeting.organizer}</span>
-                            </div>
-                          )}
-                          {meeting.attendees && meeting.attendees.length > 0 && (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Users className="h-4 w-4" />
-                              <span>{meeting.attendees.length} attendees</span>
-                            </div>
-                          )}
-                          {meeting.meeting_link && (
-                            <div className="flex items-center gap-2">
-                              <LinkIcon className="h-4 w-4 text-primary" />
-                              <a
-                                href={meeting.meeting_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                Join Meeting
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+            {projectId && (
+              <ProjectRetentionMeetings
+                projectId={projectId}
+                meetings={project?.retention_meeting_transcripts}
+                signalText={project?.retention_meeting_signal_text}
+                onSaved={({ meetings, signalText }) =>
+                  setProject((prev: any) =>
+                    prev
+                      ? {
+                          ...prev,
+                          retention_meeting_transcripts: meetings,
+                          retention_meeting_signal_text: signalText,
+                          zoom_transcript_link: meetings[0]?.transcript_link || null,
+                        }
+                      : prev,
+                  )
+                }
+              />
+            )}
           </TabsContent>
 
           {/* Knowledge Base Tab */}
@@ -746,15 +642,6 @@ const ImportedProjectDetail = () => {
           </TabsContent>
         </div>
       </Tabs>
-
-      {/* Map Meetings Dialog */}
-      <MapMeetingsDialog
-        open={mapMeetingsOpen}
-        onOpenChange={setMapMeetingsOpen}
-        onMapMeeting={handleMapMeeting}
-        mappedMeetingIds={meetings.map(m => m.meeting_id)}
-        projectId={projectId || undefined}
-      />
 
       {/* Task Form Dialog */}
       <TaskForm

@@ -20,6 +20,11 @@ interface ActiveCollabProjectCardProps {
     activecollab_sync_at?: string;
     activecollab_metadata?: any;
     activecollab_budget?: number;
+    control_tower_project_id?: string;
+    control_tower_last_synced_at?: string;
+    budget?: number;
+    clients?: { name?: string } | null;
+    client?: { name?: string } | null;
   };
   onRefresh?: () => void;
   onDelete?: (projectId: string, projectName: string) => void;
@@ -59,9 +64,17 @@ export const ActiveCollabProjectCard = ({ project, onRefresh, onDelete }: Active
     }
   };
 
-  const lastSyncDate = project.activecollab_sync_at 
+  const isControlTower = !!project.control_tower_project_id;
+  const isActiveCollab = !!project.activecollab_project_id || !!(project as any).activecollab_id;
+
+  const lastSyncDate = project.activecollab_sync_at
     ? format(new Date(project.activecollab_sync_at), 'MMM d, yyyy HH:mm')
-    : 'Never synced';
+    : project.control_tower_last_synced_at
+      ? format(new Date(project.control_tower_last_synced_at), 'MMM d, yyyy HH:mm')
+      : 'Never synced';
+
+  const displayBudget = project.activecollab_budget ?? project.budget;
+  const clientName = project.clients?.name || project.client?.name;
 
   const isLoading = getBudget.isPending || getProjectHours.isPending;
 
@@ -135,12 +148,25 @@ export const ActiveCollabProjectCard = ({ project, onRefresh, onDelete }: Active
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="text-lg group-hover:text-primary transition-colors">
                 {project.name}
               </CardTitle>
+              {isControlTower && (
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                  Control Tower
+                </Badge>
+              )}
+              {isActiveCollab && !isControlTower && (
+                <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                  ActiveCollab
+                </Badge>
+              )}
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-all group-hover:translate-x-1" />
             </div>
+            {clientName && (
+              <p className="text-xs text-muted-foreground mt-1">Client: {clientName}</p>
+            )}
             {project.description && (
               <CardDescription className="mt-1.5 line-clamp-2">
                 {project.description}
@@ -178,15 +204,16 @@ export const ActiveCollabProjectCard = ({ project, onRefresh, onDelete }: Active
             <p className="text-xs text-muted-foreground">Last Sync</p>
             <p className="text-sm font-medium">{lastSyncDate}</p>
           </div>
-          {project.activecollab_budget !== null && project.activecollab_budget !== undefined && (
+          {displayBudget !== null && displayBudget !== undefined && (
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Budget</p>
-              <p className="text-sm font-medium">${project.activecollab_budget.toLocaleString()}</p>
+              <p className="text-sm font-medium">${Number(displayBudget).toLocaleString()}</p>
             </div>
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons — ActiveCollab sync only */}
+        {isActiveCollab && (
         <div className="flex flex-wrap gap-2 pt-2 border-t">
           <Button
             size="sm"
@@ -222,6 +249,7 @@ export const ActiveCollabProjectCard = ({ project, onRefresh, onDelete }: Active
             <span className="ml-2">Sync Hours</span>
           </Button>
         </div>
+        )}
       </CardContent>
     </Card>
   );

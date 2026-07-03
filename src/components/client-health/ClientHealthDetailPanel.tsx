@@ -4,8 +4,10 @@ import { Separator } from "@/components/ui/separator";
 import { ClientHealthSnapshot } from "@/hooks/useClientHealth";
 import { getBandConfig } from "./HealthPortfolioSummary";
 import { RecoveryActionBar } from "./RecoveryActionBar";
+import { ClientRecoveryTasksExpandable } from "./ClientRecoveryTasksExpandable";
+import { ClientProjectConcerns } from "./ClientProjectConcerns";
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangle, CheckCircle2, Lightbulb } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb, ListTodo } from "lucide-react";
 
 interface ClientHealthDetailPanelProps {
   snapshot: ClientHealthSnapshot | null;
@@ -59,6 +61,8 @@ export function ClientHealthDetailPanel({
             </div>
           )}
 
+          <ClientProjectConcerns signals={snapshot.signals} />
+
           {snapshot.root_causes.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -110,6 +114,18 @@ export function ClientHealthDetailPanel({
               </ol>
             </div>
           )}
+
+          <Separator />
+          <div>
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <ListTodo className="h-4 w-4 text-primary" />
+              Recovery Tasks
+            </h4>
+            <ClientRecoveryTasksExpandable
+              clientId={snapshot.client_id}
+              defaultOpen
+            />
+          </div>
 
           {snapshot.recommended_actions.length > 0 && (
             <>

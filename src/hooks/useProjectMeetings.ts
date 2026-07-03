@@ -26,7 +26,6 @@ export interface ProjectMeeting {
 export const useProjectMeetings = (projectId?: string) => {
   const queryClient = useQueryClient();
 
-  // Fetch all meetings mapped to this project
   const { data: meetings = [], isLoading, refetch } = useQuery({
     queryKey: ['project-meetings', projectId],
     enabled: Boolean(projectId),
@@ -44,7 +43,6 @@ export const useProjectMeetings = (projectId?: string) => {
     },
   });
 
-  // Map a meeting to the project
   const mapMeeting = useMutation({
     mutationFn: async (meeting: {
       meeting_id: string;
@@ -61,7 +59,6 @@ export const useProjectMeetings = (projectId?: string) => {
     }) => {
       if (!projectId) throw new Error('Project ID is required');
 
-      // Check if meeting is already mapped
       const { data: existing } = await (supabase as any)
         .from('project_meetings')
         .select('id')
@@ -84,11 +81,8 @@ export const useProjectMeetings = (projectId?: string) => {
 
       if (error) throw error;
 
-      // Add meeting to knowledge base
       try {
-        // Use the meeting description which contains the transcript summary
-        let transcript = meeting.meeting_description || '';
-
+        const transcript = meeting.meeting_description || '';
         const meetingText = `
 Meeting: ${meeting.meeting_title}
 Type: ${meeting.meeting_type || 'N/A'}
@@ -111,7 +105,6 @@ ${transcript ? `Transcript:\n${transcript}` : ''}
         });
       } catch (kbError) {
         console.error('Failed to add meeting to knowledge base:', kbError);
-        // Don't throw - the meeting is still mapped even if KB addition fails
       }
 
       return data;
@@ -125,7 +118,6 @@ ${transcript ? `Transcript:\n${transcript}` : ''}
     },
   });
 
-  // Unmap a meeting from the project
   const unmapMeeting = useMutation({
     mutationFn: async (meetingId: string) => {
       const { error } = await (supabase as any)

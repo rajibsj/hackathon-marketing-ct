@@ -121,6 +121,11 @@ Documentation about the current state of the system - architecture, tech stack, 
   - Searchable assignee selector
   - URL detection and linking in descriptions
   - Real-time cache invalidation
+- **[client-retention-copilot.md](./System/features/client-retention-copilot.md)** - AI Client Retention Copilot (Mar 2026)
+  - ActiveCollab + Control Tower delivery signals
+  - Project-mapped meeting transcripts
+  - Portfolio analysis, churn risk, recovery tasks
+  - Setup, routes, and deployment checklist
 
 ---
 
@@ -409,9 +414,9 @@ For questions about this documentation or the codebase:
 
 ---
 
-**Last Updated:** 2026-01-28
+**Last Updated:** 2026-03-20
 
-**Documentation Version:** 2.2.0
+**Documentation Version:** 2.3.0
 
 **Codebase Version:** See git commit history
 
@@ -440,6 +445,12 @@ This documentation structure now includes:
 - 6-file audit report
 
 **Total:** 30+ comprehensive documentation files covering all aspects of the SJ Marketing AI platform.
+
+### Recent Documentation Updates (Mar 20, 2026)
+
+**New:**
+- `System/features/client-retention-copilot.md` — Retention Copilot architecture, data sources, routes, deployment
+- Root `README.md` — Setup, demo login, retention copilot workflow and troubleshooting
 
 ### Recent Documentation Updates (Jan 28, 2026)
 

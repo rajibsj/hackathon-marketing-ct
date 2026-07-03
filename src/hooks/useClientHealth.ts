@@ -402,7 +402,7 @@ export function useClientHealth() {
 
       return result;
     },
-    onSuccess: (result) => {
+    onSuccess: (result, clientId) => {
       queryClient.invalidateQueries({ queryKey: ["client-health-snapshots"] });
       const count = result?.analyzed_count ?? 0;
       const errorCount = result?.error_count ?? 0;
@@ -411,9 +411,12 @@ export function useClientHealth() {
           ?.map((e) => e.client_name)
           .filter(Boolean)
           .join(", ");
+        const scope = clientId ? "Client analysis" : `Analyzed ${count} client(s)`;
         toast.warning(
-          `Analyzed ${count} client(s), ${errorCount} failed${failedNames ? `: ${failedNames}` : ""}`,
+          `${scope}, ${errorCount} failed${failedNames ? `: ${failedNames}` : ""}`,
         );
+      } else if (clientId) {
+        toast.success("Client analysis complete");
       } else {
         toast.success(`Portfolio analysis complete — ${count} client${count === 1 ? "" : "s"} analyzed`);
       }
@@ -438,6 +441,10 @@ export function useClientHealth() {
     .sort()
     .reverse()[0];
 
+  const analyzingClientId = analyzePortfolio.isPending
+    ? (analyzePortfolio.variables as string | undefined)
+    : undefined;
+
   return {
     snapshots,
     isLoading,
@@ -447,10 +454,35 @@ export function useClientHealth() {
     analyzePortfolio: analyzePortfolio.mutate,
     analyzePortfolioAsync: analyzePortfolio.mutateAsync,
     isAnalyzing: analyzePortfolio.isPending,
+    isAnalyzingAll: analyzePortfolio.isPending && !analyzePortfolio.variables,
+    analyzingClientId,
     bandCounts,
     lastScanAt,
     monitoredCount: snapshots.length,
   };
+}
+
+async function resolveClientProjectId(clientId: string, projectId?: string | null) {
+  if (projectId) return projectId;
+
+  const { data: projects, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("status", "active")
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (projectError) throw projectError;
+  return projects?.[0]?.id;
+}
+
+function invalidateRecoveryTaskQueries(queryClient: ReturnType<typeof useQueryClient>, clientId: string) {
+  queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
+  queryClient.invalidateQueries({ queryKey: ["all-project-tasks"] });
+  queryClient.invalidateQueries({ queryKey: ["recovery-tasks"] });
+  queryClient.invalidateQueries({ queryKey: ["recovery-tasks-summary"] });
+  queryClient.invalidateQueries({ queryKey: ["recovery-tasks", clientId] });
 }
 
 export function useCreateRecoveryTasks() {
@@ -471,20 +503,7 @@ export function useCreateRecoveryTasks() {
         throw new Error("No task actions to create");
       }
 
-      let targetProjectId = projectId;
-
-      if (!targetProjectId) {
-        const { data: projects, error: projectError } = await supabase
-          .from("projects")
-          .select("id")
-          .eq("client_id", clientId)
-          .eq("status", "active")
-          .order("created_at", { ascending: true })
-          .limit(1);
-
-        if (projectError) throw projectError;
-        targetProjectId = projects?.[0]?.id;
-      }
+      const targetProjectId = await resolveClientProjectId(clientId, projectId);
 
       const inserts = taskActions.map((action) => ({
         client_id: clientId,
@@ -506,15 +525,63 @@ export function useCreateRecoveryTasks() {
       return data;
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["project-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["all-project-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["recovery-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["recovery-tasks-summary"] });
-      queryClient.invalidateQueries({ queryKey: ["recovery-tasks", variables.clientId] });
+      invalidateRecoveryTaskQueries(queryClient, variables.clientId);
       toast.success(`Created ${data?.length ?? 0} recovery task${(data?.length ?? 0) === 1 ? "" : "s"}`);
     },
     onError: (err: Error) => {
       toast.error(err.message || "Failed to create recovery tasks");
+    },
+  });
+}
+
+export function useCreateManualRecoveryTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      clientId,
+      title,
+      description,
+      projectId,
+      priority = "high",
+    }: {
+      clientId: string;
+      title: string;
+      description?: string;
+      projectId?: string | null;
+      priority?: "low" | "medium" | "high" | "urgent";
+    }) => {
+      const trimmedTitle = title.trim();
+      if (!trimmedTitle) {
+        throw new Error("Task title is required");
+      }
+
+      const targetProjectId = await resolveClientProjectId(clientId, projectId);
+
+      const { data, error } = await supabase
+        .from("project_tasks")
+        .insert({
+          client_id: clientId,
+          project_id: targetProjectId || undefined,
+          title: formatRecoveryTitle(trimmedTitle),
+          description: buildRecoveryDescription(description),
+          priority,
+          status: "todo" as const,
+          category: "clients" as const,
+          due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      invalidateRecoveryTaskQueries(queryClient, variables.clientId);
+      toast.success("Recovery task created");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to create recovery task");
     },
   });
 }

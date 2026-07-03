@@ -59,6 +59,7 @@ supabase db push
 supabase db push --include-all
 
 supabase functions deploy client-health-copilot
+supabase functions deploy meeting-transcript-scan
 ```
 
 Set **Supabase → Edge Functions → Secrets**:
@@ -121,8 +122,8 @@ Monitors client health using **delivery signals** from ActiveCollab and Control 
 ### Typical workflow
 
 1. **Seed or sync data** — Run migrations (demo seeds under `supabase/migrations/20260320*`) or sync ActiveCollab / Control Tower projects.
-2. **Add meeting signals** — On a project (`/projects/:slug/details` → **Meetings**), add meeting links/dates and click **Generate retention text**.
-3. **Run analysis** — From the portfolio page click **Analyze Portfolio**, or from a client page click **Run Analysis** (single client).
+2. **Add meeting signals** — On a project (`/projects/:slug/details` → **Meetings**), add meeting links/dates and optional transcript text. Click **Save meetings** or **Generate retention text** to scan for client concern keywords (disappointed, frustrating, overdue, missed deadline, sue, etc.). Results are stored on each meeting for future retention analysis.
+3. **Run analysis** — From the portfolio page click **Analyze Portfolio**, or from a client page click **Run Analysis** (single client). Saved meeting concern keywords are included in the health score and shown **project-wise** in each client's detail panel.
 4. **Review results** — Open a client card for health score, project-wise concerns, and recovery actions.
 
 ### Key files

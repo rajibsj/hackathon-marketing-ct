@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { RecoveryTask, RECOVERY_TITLE_PREFIX } from "@/hooks/useClientHealth";
+import { ManualRecoveryTaskInput } from "./ManualRecoveryTaskInput";
 import { format } from "date-fns";
 import { ChevronRight, ListTodo, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,8 @@ function statusVariant(status: string): "destructive" | "secondary" | "outline" 
 
 interface ClientRecoveryTasksListProps {
   tasks: RecoveryTask[];
+  clientId?: string;
+  projectId?: string | null;
   isLoading?: boolean;
   isError?: boolean;
   className?: string;
@@ -45,6 +48,8 @@ interface ClientRecoveryTasksListProps {
 
 export function ClientRecoveryTasksList({
   tasks,
+  clientId,
+  projectId,
   isLoading = false,
   isError = false,
   className,
@@ -80,7 +85,7 @@ export function ClientRecoveryTasksList({
         <p className="text-xs text-muted-foreground py-1.5">
           {tasks.length > 0
             ? "All recovery tasks completed."
-            : "No recovery tasks yet — create from recommended actions."}
+            : "No recovery tasks yet — add one below or create from recommended actions."}
         </p>
       ) : (
         <ul className="space-y-1">
@@ -110,6 +115,14 @@ export function ClientRecoveryTasksList({
             </li>
           ))}
         </ul>
+      )}
+
+      {clientId && (
+        <ManualRecoveryTaskInput
+          clientId={clientId}
+          projectId={projectId}
+          compact
+        />
       )}
     </div>
   );

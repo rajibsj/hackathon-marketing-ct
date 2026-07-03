@@ -18,6 +18,8 @@ export default function ClientRetentionCopilot() {
     snapshotsError,
     analyzePortfolio,
     isAnalyzing,
+    isAnalyzingAll,
+    analyzingClientId,
     bandCounts,
     lastScanAt,
     monitoredCount,
@@ -109,7 +111,7 @@ export default function ClientRetentionCopilot() {
           <AlertDescription>
             ActiveCollab tasks, Control Tower tasks, comments, deadlines, and project meeting transcripts
             you seeded are inputs to the copilot. They do not appear on cards until you click{" "}
-            <strong>Analyze Portfolio</strong>. If analysis fails, check that
+            <strong>Analyze Portfolio</strong> or <strong>Analyze Client</strong> on a card. If analysis fails, check that
             <code className="mx-1">GEMINI_API_KEY</code> is set in Supabase → Edge Functions → Secrets.
           </AlertDescription>
         </Alert>
@@ -158,6 +160,9 @@ export default function ClientRetentionCopilot() {
                     snapshot={snapshot}
                     selected={selectedSnapshot?.client_id === snapshot.client_id}
                     onClick={() => handleSelectClient(snapshot)}
+                    onAnalyze={(clientId) => analyzePortfolio(clientId)}
+                    isAnalyzingClient={analyzingClientId === snapshot.client_id}
+                    isAnalyzingAll={isAnalyzingAll}
                     recoverySummary={recoverySummary.get(snapshot.client_id)}
                     recoveryTasks={recoveryByClient.get(snapshot.client_id) ?? []}
                     recoveryTasksLoading={recoveryTasksLoading}
@@ -174,6 +179,11 @@ export default function ClientRetentionCopilot() {
         snapshot={selectedSnapshot}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+        onAnalyze={(clientId) => analyzePortfolio(clientId)}
+        isAnalyzingClient={
+          selectedSnapshot ? analyzingClientId === selectedSnapshot.client_id : false
+        }
+        isAnalyzingAll={isAnalyzingAll}
       />
     </div>
   );

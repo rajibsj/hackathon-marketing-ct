@@ -1,5 +1,6 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ClientHealthSnapshot } from "@/hooks/useClientHealth";
 import { getBandConfig } from "./HealthPortfolioSummary";
@@ -7,18 +8,24 @@ import { RecoveryActionBar } from "./RecoveryActionBar";
 import { ClientRecoveryTasksExpandable } from "./ClientRecoveryTasksExpandable";
 import { ClientProjectConcerns } from "./ClientProjectConcerns";
 import { formatDistanceToNow } from "date-fns";
-import { AlertTriangle, CheckCircle2, Lightbulb, ListTodo } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Lightbulb, ListTodo, Loader2, Play } from "lucide-react";
 
 interface ClientHealthDetailPanelProps {
   snapshot: ClientHealthSnapshot | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onAnalyze?: (clientId: string) => void;
+  isAnalyzingClient?: boolean;
+  isAnalyzingAll?: boolean;
 }
 
 export function ClientHealthDetailPanel({
   snapshot,
   open,
   onOpenChange,
+  onAnalyze,
+  isAnalyzingClient = false,
+  isAnalyzingAll = false,
 }: ClientHealthDetailPanelProps) {
   if (!snapshot) return null;
 
@@ -45,6 +52,26 @@ export function ClientHealthDetailPanel({
             )}
           </SheetDescription>
         </SheetHeader>
+
+        {onAnalyze && (
+          <Button
+            className="w-full"
+            variant="outline"
+            disabled={isAnalyzingClient || isAnalyzingAll}
+            onClick={() => onAnalyze(snapshot.client_id)}
+          >
+            {isAnalyzingClient ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            {isAnalyzingClient
+              ? "Analyzing..."
+              : snapshot.summary
+                ? "Re-analyze Client"
+                : "Analyze Client"}
+          </Button>
+        )}
 
         <div className="mt-6 space-y-6">
           {snapshot.summary && (
@@ -123,6 +150,7 @@ export function ClientHealthDetailPanel({
             </h4>
             <ClientRecoveryTasksExpandable
               clientId={snapshot.client_id}
+              projectId={primaryProjectId}
               defaultOpen
             />
           </div>

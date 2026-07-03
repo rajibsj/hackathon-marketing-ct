@@ -10,12 +10,14 @@ import {
   useStartRecoveryTask,
   RECOVERY_TITLE_PREFIX,
 } from "@/hooks/useClientHealth";
+import { ManualRecoveryTaskInput } from "./ManualRecoveryTaskInput";
 import { format } from "date-fns";
 import { CheckCircle2, ExternalLink, Loader2, PlayCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RecoveryTaskListProps {
   clientId?: string;
+  projectId?: string | null;
   showClientName?: boolean;
   compact?: boolean;
   defaultFilter?: RecoveryTaskFilter;
@@ -54,6 +56,7 @@ function statusLabel(status: string) {
 
 export function RecoveryTaskList({
   clientId,
+  projectId,
   showClientName = false,
   compact = false,
   defaultFilter = "pending",
@@ -66,6 +69,14 @@ export function RecoveryTaskList({
 
   return (
     <div className={cn("space-y-3", compact && "space-y-2")}>
+      {clientId && (
+        <ManualRecoveryTaskInput
+          clientId={clientId}
+          projectId={projectId}
+          compact={compact}
+        />
+      )}
+
       <Tabs value={filter} onValueChange={(value) => setFilter(value as RecoveryTaskFilter)}>
         <TabsList className={cn("grid w-full grid-cols-4", compact ? "h-8" : "h-9")}>
           {FILTERS.map((item) => (

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireRole } from "../_shared/auth-guard.ts";
+import { scanMeetingTranscriptForConcerns } from "../_shared/meeting-concern-scan.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -45,6 +46,9 @@ interface MeetingSignal {
   transcript_link?: string;
   project_id?: string;
   project_name?: string;
+  concern_keywords?: string[];
+  concern_flags?: string[];
+  has_client_concerns?: boolean;
 }
 
 interface HealthAnalysis {
@@ -72,7 +76,8 @@ Analyze the provided client profile and aggregated signals JSON. Produce a churn
 
 Signals focus on delivery from ActiveCollab and Control Tower: project tasks, task comments, and due dates/deadlines.
 Meetings are only included when mapped to a client project.
-Use project_breakdown in signals to address concerns project-by-project.
+Use project_breakdown in signals to address concerns project-by-project, including meeting_concern_keywords from saved transcript scans.
+Weight meeting transcript concern keywords (disappointed, frustrating, overdue, missed deadline, sue, etc.) heavily when scoring churn risk.
 Do not infer risk from HubSpot, Slack, Teams, website traffic, search console, or invoice data.
 
 Return JSON with this exact structure:
@@ -154,6 +159,9 @@ function parseProjectRetentionMeetings(
   meeting_date: string;
   transcript_link: string;
   generated_text: string;
+  concern_keywords: string[];
+  concern_flags: string[];
+  has_client_concerns: boolean;
 }> {
   if (!Array.isArray(value)) return [];
 
@@ -166,11 +174,27 @@ function parseProjectRetentionMeetings(
       const date = String(item.meeting_date || "").trim();
       if (!generated && !link) return null;
 
+      const storedFlags = Array.isArray(item.concern_flags)
+        ? item.concern_flags.map((flag) => String(flag))
+        : [];
+      const storedKeywords = Array.isArray(item.concern_keywords)
+        ? item.concern_keywords.map((kw) => String(kw))
+        : [];
+      const scanSource = generated || String(item.transcript_text || "").trim();
+      const liveScan = scanSource ? scanMeetingTranscriptForConcerns(scanSource) : null;
+      const concern_flags = storedFlags.length > 0 ? storedFlags : (liveScan?.flags || []);
+      const concern_keywords = storedKeywords.length > 0
+        ? storedKeywords
+        : (liveScan?.keywords || []);
+
       return {
         title: String(item.title || "Client meeting").trim(),
         meeting_date: date,
         transcript_link: link,
         generated_text: generated || `Transcript reference: ${link}`,
+        concern_keywords,
+        concern_flags,
+        has_client_concerns: Boolean(item.has_client_concerns) || concern_flags.length > 0,
       };
     })
     .filter((row): row is {
@@ -178,11 +202,58 @@ function parseProjectRetentionMeetings(
       meeting_date: string;
       transcript_link: string;
       generated_text: string;
+      concern_keywords: string[];
+      concern_flags: string[];
+      has_client_concerns: boolean;
     } => row !== null);
 }
 
 function getTaskSource(task: Record<string, unknown>): "activecollab" | "control_tower" {
   return task.activecollab_task_id ? "activecollab" : "control_tower";
+}
+
+function collectProjectMeetingConcerns(
+  meetings: MeetingSignal[],
+  retentionTranscripts: unknown,
+): {
+  keywords: string[];
+  flags: string[];
+  meetingsWithConcerns: number;
+} {
+  const keywords = new Set<string>();
+  const flags: string[] = [];
+
+  for (const meeting of meetings) {
+    for (const keyword of meeting.concern_keywords || []) {
+      keywords.add(keyword);
+    }
+    for (const flag of meeting.concern_flags || []) {
+      flags.push(flag);
+    }
+  }
+
+  const retentionRows = parseProjectRetentionMeetings(retentionTranscripts);
+  let meetingsWithConcerns = 0;
+
+  for (const row of retentionRows) {
+    if (row.has_client_concerns || row.concern_keywords.length > 0) {
+      meetingsWithConcerns += 1;
+    }
+    for (const keyword of row.concern_keywords) {
+      keywords.add(keyword);
+    }
+    for (const flag of row.concern_flags) {
+      flags.push(flag);
+    }
+  }
+
+  return {
+    keywords: Array.from(keywords),
+    flags,
+    meetingsWithConcerns: Math.max(meetingsWithConcerns, meetings.filter(
+      (m) => m.has_client_concerns || (m.concern_keywords?.length || 0) > 0,
+    ).length),
+  };
 }
 
 function buildProjectBreakdown(
@@ -207,6 +278,7 @@ function buildProjectBreakdown(
     projectName: string,
     meta: { activecollab_linked?: boolean; control_tower_linked?: boolean },
     projectTasks: Array<Record<string, unknown>>,
+    retentionTranscripts?: unknown,
   ) => {
     const open = projectTasks.filter((t) => !isTaskDone(t.status as string));
     const overdue = open.filter((t) => {
@@ -244,7 +316,27 @@ function buildProjectBreakdown(
     if (negativeComment) {
       concerns.push(`Negative comment on "${negativeComment.task_title || "task"}"`);
     }
-    if (meetings.length === 0 && projectTasks.length > 0) {
+
+    const meetingConcerns = collectProjectMeetingConcerns(meetings, retentionTranscripts);
+    if (meetingConcerns.keywords.length > 0) {
+      concerns.push(
+        `Meeting transcript concern keywords: ${meetingConcerns.keywords.join(", ")}`,
+      );
+    }
+    for (const flag of meetingConcerns.flags.slice(0, 3)) {
+      const normalized = flag.startsWith("Keyword") ? flag : `Meeting concern: ${flag}`;
+      if (!concerns.includes(normalized)) {
+        concerns.push(normalized);
+      }
+    }
+    if (meetingConcerns.meetingsWithConcerns > 1) {
+      concerns.push(`${meetingConcerns.meetingsWithConcerns} meetings flagged with client concerns`);
+    }
+
+    if (meetings.length === 0 &&
+      parseProjectRetentionMeetings(retentionTranscripts).length === 0 &&
+      projectTasks.length > 0
+    ) {
       concerns.push("No recent project-mapped meeting transcripts");
     }
 
@@ -267,7 +359,12 @@ function buildProjectBreakdown(
       meetings: meetings.slice(0, 3).map((m) => ({
         subject: m.subject,
         date: m.date,
+        concern_keywords: m.concern_keywords || [],
+        has_client_concerns: Boolean(m.has_client_concerns),
       })),
+      meeting_concern_keywords: meetingConcerns.keywords,
+      meeting_concern_count: meetingConcerns.keywords.length,
+      meeting_concern_flags: meetingConcerns.flags.slice(0, 5),
       concerns,
     };
   };
@@ -278,7 +375,7 @@ function buildProjectBreakdown(
     return buildForTasks(projectId, String(project.name), {
       activecollab_linked: Boolean(project.activecollab_project_id),
       control_tower_linked: Boolean(project.control_tower_project_id),
-    }, projectTasks);
+    }, projectTasks, project.retention_meeting_transcripts);
   });
 
   const projectIdSet = new Set((projects || []).map((p) => String(p.id)));
@@ -439,6 +536,9 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
       transcript_link: row.transcript_link,
       project_id: project.id,
       project_name: project.name,
+      concern_keywords: row.concern_keywords,
+      concern_flags: row.concern_flags,
+      has_client_concerns: row.has_client_concerns,
     }));
   });
 
@@ -469,7 +569,27 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
     ...allProjectMeetings.map((m) => m.content_excerpt),
     ...(retentionMeetingSignalText ? [retentionMeetingSignalText] : []),
   ].filter((text) => text.length > 0);
-  const meetingFlags = flagNegativeComments(meetingTexts);
+  const storedMeetingFlags = allProjectMeetings.flatMap((m) => m.concern_flags || []);
+  const meetingFlags = storedMeetingFlags.length > 0
+    ? storedMeetingFlags
+    : flagNegativeComments(meetingTexts);
+
+  const projectBreakdown = buildProjectBreakdown(
+    projects || [],
+    allTasks,
+    recentComments,
+    allProjectMeetings,
+    taskById,
+    now,
+    fourteenDaysAgo,
+    sevenDaysAhead,
+    formatTask,
+  );
+
+  const meetingConcernKeywordCount = projectBreakdown.reduce(
+    (sum, project) => sum + (Number(project.meeting_concern_count) || 0),
+    0,
+  );
 
   let heuristicScore = client.satisfaction_score ?? 85;
   heuristicScore -= Math.min(overdueTasks.length * 5, 25);
@@ -483,6 +603,9 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
   if (meetingFlags.length > 0) {
     heuristicScore -= Math.min(meetingFlags.length * 5, 15);
   }
+  if (meetingConcernKeywordCount > 0) {
+    heuristicScore -= Math.min(meetingConcernKeywordCount * 4, 20);
+  }
   if (approachingDeadlineTasks.length >= 3) {
     heuristicScore -= 5;
   }
@@ -491,18 +614,6 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
   const primaryProjectId = projectIds[0] || null;
   const activecollabTaskCount = allTasks.filter((t) => t.activecollab_task_id).length;
   const controlTowerTaskCount = allTasks.length - activecollabTaskCount;
-
-  const projectBreakdown = buildProjectBreakdown(
-    projects || [],
-    allTasks,
-    recentComments,
-    allProjectMeetings,
-    taskById,
-    now,
-    fourteenDaysAgo,
-    sevenDaysAhead,
-    formatTask,
-  );
 
   return {
     client,
@@ -576,6 +687,11 @@ async function collectSignals(supabase: ReturnType<typeof createClient>, clientI
         project_meetings: allProjectMeetings,
         retention_meeting_signal_text: retentionMeetingSignalText || null,
         negative_flags: meetingFlags,
+        concern_keyword_count: allProjectMeetings.reduce(
+          (sum, meeting) => sum + (meeting.concern_keywords?.length || 0),
+          0,
+        ),
+        project_meeting_concern_keywords: meetingConcernKeywordCount,
       },
     },
     heuristicScore,
@@ -642,11 +758,18 @@ function buildFallbackAnalysis(
   const rootCauses: RootCause[] = [];
   for (const project of projectBreakdown) {
     for (const concern of project.concerns || []) {
+      const lower = concern.toLowerCase();
       rootCauses.push({
         cause: `${project.project_name || "Project"}: delivery concern`,
         evidence: concern,
         confidence: 0.8,
-        severity: concern.toLowerCase().includes("overdue") || concern.toLowerCase().includes("negative")
+        severity: lower.includes("overdue") ||
+            lower.includes("negative") ||
+            lower.includes("meeting") ||
+            lower.includes("transcript") ||
+            lower.includes("sue") ||
+            lower.includes("disappoint") ||
+            lower.includes("frustrat")
           ? "high"
           : "medium",
       });

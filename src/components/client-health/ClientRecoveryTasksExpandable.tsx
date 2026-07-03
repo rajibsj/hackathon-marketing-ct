@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 interface ClientRecoveryTasksExpandableProps {
   clientId: string;
+  projectId?: string | null;
   summary?: RecoveryTaskClientSummary;
   defaultOpen?: boolean;
 }
@@ -23,6 +24,7 @@ function stopCardClick(event: React.MouseEvent) {
 
 export function ClientRecoveryTasksExpandable({
   clientId,
+  projectId,
   summary,
   defaultOpen = false,
 }: ClientRecoveryTasksExpandableProps) {
@@ -72,6 +74,7 @@ export function ClientRecoveryTasksExpandable({
       >
         <RecoveryTaskList
           clientId={clientId}
+          projectId={projectId}
           compact
           defaultFilter="all"
           enabled={open}

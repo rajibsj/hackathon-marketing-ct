@@ -78,6 +78,27 @@ export function parseRetentionMeetings(value: unknown): RetentionMeetingEntry[] 
     .filter((row): row is RetentionMeetingEntry => row !== null);
 }
 
+export function hydrateRetentionMeetingRow(
+  entry: RetentionMeetingEntry,
+): RetentionMeetingEntry {
+  const hasStoredConcerns =
+    Boolean(entry.keyword_scan_at) || (entry.concern_keywords?.length ?? 0) > 0;
+
+  if (hasStoredConcerns) {
+    return {
+      ...entry,
+      has_client_concerns:
+        entry.has_client_concerns ?? (entry.concern_keywords?.length ?? 0) > 0,
+    };
+  }
+
+  if (entry.transcript_text?.trim()) {
+    return applyConcernScanToMeeting(entry);
+  }
+
+  return entry;
+}
+
 export function applyConcernScanToMeeting(
   entry: RetentionMeetingEntry,
   scanAt = new Date().toISOString(),

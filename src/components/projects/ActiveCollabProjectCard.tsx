@@ -3,10 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useActiveCollabProjects, useActiveCollabTimeTracking } from '@/hooks/useActiveCollab';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { getProjectUrl } from '@/lib/projectSlugUtils';
+import { getClientUrl } from '@/lib/clientSlugUtils';
+import { Client } from '@/hooks/useClients';
 import { supabase } from '@/integrations/supabase/client';
 import { useRef } from 'react';
 
@@ -23,8 +25,8 @@ interface ActiveCollabProjectCardProps {
     control_tower_project_id?: string;
     control_tower_last_synced_at?: string;
     budget?: number;
-    clients?: { name?: string } | null;
-    client?: { name?: string } | null;
+    clients?: { id?: string; name?: string; company?: string; slug?: string } | null;
+    client?: { id: string; name: string; company?: string; slug?: string } | null;
   };
   onRefresh?: () => void;
   onDelete?: (projectId: string, projectName: string) => void;
@@ -74,7 +76,8 @@ export const ActiveCollabProjectCard = ({ project, onRefresh, onDelete }: Active
       : 'Never synced';
 
   const displayBudget = project.activecollab_budget ?? project.budget;
-  const clientName = project.clients?.name || project.client?.name;
+  const linkedClient = project.client ?? (project.clients?.id ? project.clients as Client : null);
+  const clientName = linkedClient?.name || project.clients?.name || project.client?.name;
 
   const isLoading = getBudget.isPending || getProjectHours.isPending;
 
@@ -165,7 +168,20 @@ export const ActiveCollabProjectCard = ({ project, onRefresh, onDelete }: Active
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-all group-hover:translate-x-1" />
             </div>
             {clientName && (
-              <p className="text-xs text-muted-foreground mt-1">Client: {clientName}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Client:{' '}
+                {linkedClient?.id ? (
+                  <Link
+                    to={getClientUrl(linkedClient as Client)}
+                    className="text-primary hover:underline font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {clientName}
+                  </Link>
+                ) : (
+                  clientName
+                )}
+              </p>
             )}
             {project.description && (
               <CardDescription className="mt-1.5 line-clamp-2">

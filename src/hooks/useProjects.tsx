@@ -27,12 +27,15 @@ export interface Project {
   activecollab_metadata?: any;
   // Control Tower integration fields
   control_tower_project_id?: string;
+  control_tower_last_synced_at?: string;
   activecollab_budget?: number;
   // Joined data
   client?: {
     id: string;
     name: string;
     company?: string;
+    slug?: string;
+    status?: 'active' | 'inactive' | 'prospect' | 'archived';
   };
 }
 
@@ -110,7 +113,7 @@ export function useProjects(params: UseProjectsParams = {}) {
       .from('projects')
       .select(`
         *,
-        client:clients(id, name, company)
+        client:clients(id, name, company, slug, status)
       `, { count: 'exact' })
       .order('created_at', { ascending: false });
 
@@ -153,7 +156,7 @@ export function useProjects(params: UseProjectsParams = {}) {
       }])
       .select(`
         *,
-        client:clients(id, name, company)
+        client:clients(id, name, company, slug, status)
       `)
       .single();
 
@@ -173,7 +176,7 @@ export function useProjects(params: UseProjectsParams = {}) {
       .eq('id', projectId)
       .select(`
         *,
-        client:clients(id, name, company)
+        client:clients(id, name, company, slug, status)
       `)
       .single();
 
@@ -235,7 +238,7 @@ export function useProjects(params: UseProjectsParams = {}) {
       .from('projects')
       .select(`
         *,
-        client:clients(id, name, company)
+        client:clients(id, name, company, slug, status)
       `)
       .eq('id', projectId)
       .maybeSingle();
@@ -278,7 +281,7 @@ export function useProjects(params: UseProjectsParams = {}) {
         client_id,
         activecollab_project_id,
         activecollab_metadata,
-        client:clients(id, name, company)
+        client:clients(id, name, company, slug, status)
       `)
       .not('activecollab_project_id', 'is', null)
       .order('name');

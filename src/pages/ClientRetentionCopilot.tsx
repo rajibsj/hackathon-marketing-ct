@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Play, Shield, Activity, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useClientHealth, ClientHealthSnapshot } from "@/hooks/useClientHealth";
+import { useClientHealth, ClientHealthSnapshot, useRecoveryTasksPortfolio } from "@/hooks/useClientHealth";
 import { HealthPortfolioSummary } from "@/components/client-health/HealthPortfolioSummary";
 import { ClientHealthCard } from "@/components/client-health/ClientHealthCard";
 import { ClientHealthDetailPanel } from "@/components/client-health/ClientHealthDetailPanel";
@@ -21,9 +22,27 @@ export default function ClientRetentionCopilot() {
     lastScanAt,
     monitoredCount,
   } = useClientHealth();
+  const {
+    byClient: recoveryByClient,
+    summary: recoverySummary,
+    isLoading: recoveryTasksLoading,
+    isError: recoveryTasksError,
+  } = useRecoveryTasksPortfolio();
 
   const [selectedSnapshot, setSelectedSnapshot] = useState<ClientHealthSnapshot | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const focusClientId = searchParams.get("client");
+
+  useEffect(() => {
+    if (!focusClientId || isLoading || snapshots.length === 0) return;
+
+    const snapshot = snapshots.find((s) => s.client_id === focusClientId);
+    if (snapshot) {
+      setSelectedSnapshot(snapshot);
+      setDetailOpen(true);
+    }
+  }, [focusClientId, snapshots, isLoading]);
 
   const handleSelectClient = (snapshot: ClientHealthSnapshot) => {
     setSelectedSnapshot(snapshot);
@@ -41,7 +60,7 @@ export default function ClientRetentionCopilot() {
             <h1 className="text-2xl font-bold">AI Client Retention Copilot</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            Autonomous account manager — monitors delivery, engagement, and analytics to predict churn
+            Monitors ActiveCollab and Control Tower delivery per project — tasks, comments, deadlines, and meetings
           </p>
           <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
@@ -88,22 +107,24 @@ export default function ClientRetentionCopilot() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Demo data is in the database — run AI analysis to see it</AlertTitle>
           <AlertDescription>
-            Tasks, comments, and meetings you seeded are inputs to the copilot. They do not appear on
-            cards until you click <strong>Analyze Portfolio</strong>. If analysis fails, check that
+            ActiveCollab tasks, Control Tower tasks, comments, deadlines, and project meeting transcripts
+            you seeded are inputs to the copilot. They do not appear on cards until you click{" "}
+            <strong>Analyze Portfolio</strong>. If analysis fails, check that
             <code className="mx-1">GEMINI_API_KEY</code> is set in Supabase → Edge Functions → Secrets.
           </AlertDescription>
         </Alert>
       )}
 
       <div className="flex flex-wrap gap-2">
-        {["ActiveCollab Tasks", "Meeting History", "GA Traffic", "HubSpot CRM"].map((source) => (
+        {[
+          "ActiveCollab Tasks",
+          "Control Tower Tasks",
+          "Task Comments",
+          "Deadlines",
+          "Project Meeting Transcripts",
+        ].map((source) => (
           <Badge key={source} variant="outline" className="text-xs">
             {source}
-          </Badge>
-        ))}
-        {["Google Search Console", "Slack Alerts", "Invoice Data"].map((source) => (
-          <Badge key={source} variant="secondary" className="text-xs opacity-60">
-            {source} · soon
           </Badge>
         ))}
       </div>
@@ -120,13 +141,13 @@ export default function ClientRetentionCopilot() {
             <h2 className="text-lg font-semibold mb-4">
               Client Portfolio
               <span className="text-muted-foreground font-normal text-sm ml-2">
-                sorted by churn risk
+                all clients · sorted by churn risk
               </span>
             </h2>
 
             {snapshots.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground border rounded-lg">
-                <p>No active clients found.</p>
+                <p>No clients found.</p>
                 <p className="text-sm mt-1">Add clients to start monitoring retention health.</p>
               </div>
             ) : (
@@ -137,6 +158,10 @@ export default function ClientRetentionCopilot() {
                     snapshot={snapshot}
                     selected={selectedSnapshot?.client_id === snapshot.client_id}
                     onClick={() => handleSelectClient(snapshot)}
+                    recoverySummary={recoverySummary.get(snapshot.client_id)}
+                    recoveryTasks={recoveryByClient.get(snapshot.client_id) ?? []}
+                    recoveryTasksLoading={recoveryTasksLoading}
+                    recoveryTasksError={recoveryTasksError}
                   />
                 ))}
               </div>

@@ -6,6 +6,71 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function useDemoControlTower() {
+  const forceDemo = Deno.env.get('CONTROL_TOWER_DEMO_MODE') === 'true';
+  const url = Deno.env.get('CONTROL_TOWER_API_URL');
+  const apiKey = Deno.env.get('CONTROL_TOWER_API_KEY');
+  return forceDemo || !url || !apiKey;
+}
+
+function toControlTowerProjectShape(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.status,
+    progress: row.progress,
+    priority: row.priority,
+    manager: row.manager,
+    team: row.team,
+    budget: row.budget,
+    actual_cost: row.actual_cost,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    team_member_ids: row.team_member_ids || [],
+    manager_id: row.manager_id,
+    project_manager_id: row.project_manager_id,
+  };
+}
+
+async function searchDemoProjects(supabase: ReturnType<typeof createClient>, searchTerm: string) {
+  const { data, error } = await supabase
+    .from('control_tower_demo_projects')
+    .select('*')
+    .ilike('name', `%${searchTerm}%`)
+    .order('name')
+    .limit(50);
+
+  if (error) {
+    console.error('❌ Demo Control Tower search error:', error);
+    throw new Error(`Failed to search demo Control Tower projects: ${error.message}`);
+  }
+
+  const projects = (data || []).map((row) => toControlTowerProjectShape(row as Record<string, unknown>));
+  console.log(`✅ Found ${projects.length} demo Control Tower projects for "${searchTerm}"`);
+  return projects;
+}
+
+async function getDemoProject(supabase: ReturnType<typeof createClient>, projectId: string) {
+  const { data, error } = await supabase
+    .from('control_tower_demo_projects')
+    .select('*')
+    .eq('id', projectId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('❌ Demo Control Tower fetch error:', error);
+    throw new Error(`Failed to fetch demo Control Tower project: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error(`Project ${projectId} not found in demo Control Tower catalog`);
+  }
+
+  console.log(`✅ Fetched demo project: ${data.name}`);
+  return toControlTowerProjectShape(data as Record<string, unknown>);
+}
+
 // Get Control Tower API credentials from environment
 function getControlTowerCredentials() {
   const url = Deno.env.get('CONTROL_TOWER_API_URL');
@@ -207,9 +272,10 @@ serve(async (req) => {
 
     switch (action) {
       case 'debug': {
-        // Debug endpoint to check environment variables
+        const demoMode = useDemoControlTower();
         return new Response(
           JSON.stringify({
+            demoMode,
             hasUrl: !!Deno.env.get('CONTROL_TOWER_API_URL'),
             hasApiKey: !!Deno.env.get('CONTROL_TOWER_API_KEY'),
             urlPreview: Deno.env.get('CONTROL_TOWER_API_URL')?.substring(0, 20),
@@ -233,10 +299,11 @@ serve(async (req) => {
           );
         }
 
-        // Search Control Tower API
-        const projects = await searchControlTowerProjects(projectName.trim());
+        const projects = useDemoControlTower()
+          ? await searchDemoProjects(supabase, projectName.trim())
+          : await searchControlTowerProjects(projectName.trim());
 
-        return new Response(JSON.stringify({ projects }), {
+        return new Response(JSON.stringify({ projects, demoMode: useDemoControlTower() }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -255,8 +322,9 @@ serve(async (req) => {
 
         console.log(`🔍 IMPORT REQUEST - Project ID: ${projectId}, Name: ${projectName}`);
 
-        // Fetch project from Control Tower
-        const ctProject = await getControlTowerProject(projectId);
+        const ctProject = useDemoControlTower()
+          ? await getDemoProject(supabase, projectId)
+          : await getControlTowerProject(projectId);
         console.log('📋 Control Tower Project Data:', JSON.stringify(ctProject, null, 2));
 
         // Check if project already exists locally
@@ -326,6 +394,7 @@ serve(async (req) => {
           JSON.stringify({
             project,
             isNew,
+            demoMode: useDemoControlTower(),
             message: isNew
               ? `Project "${project.name}" imported successfully`
               : `Project "${project.name}" updated successfully`,

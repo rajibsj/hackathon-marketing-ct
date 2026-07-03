@@ -13,8 +13,8 @@ import { TaskCard } from "@/components/tasks/TaskCard";
 import { useState, useEffect } from "react";
 import { TaskForm } from "@/components/tasks/TaskForm";
 import { slugify } from '@/lib/slugify';
-import { getClientUrl } from '@/lib/clientSlugUtils';
 import { getProjectKnowledgeUrl } from '@/lib/projectSlugUtils';
+import { ProjectClientPortfolioPanel } from '@/components/projects/ProjectClientPortfolioPanel';
 
 const statusColors = {
   planning: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
@@ -49,6 +49,10 @@ export default function ProjectDetail() {
   const tasksPerPage = 10;
 
   const { projects, loading: projectLoading } = useProjects({ limit: 1000 });
+  const { projects: clientProjects, loading: clientProjectsLoading } = useProjects({
+    client_id: projects.find((p) => slugify(p.name) === slug)?.client_id,
+    limit: 100,
+  });
   
   // Find project by slug
   const project = projects.find(p => slugify(p.name) === slug);
@@ -140,14 +144,6 @@ export default function ProjectDetail() {
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Knowledge Base
               </Button>
-              {project.client && (
-                <Button onClick={() => {
-                  const clientSlug = project.client.company ? project.client.company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-') : project.client.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-{2,}/g, '-');
-                  navigate(`/clients/${clientSlug}`);
-                }}>
-                  View Client
-                </Button>
-              )}
             </div>
           </div>
         </CardHeader>
@@ -176,6 +172,15 @@ export default function ProjectDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {project.client && (
+        <ProjectClientPortfolioPanel
+          client={project.client}
+          projects={clientProjects}
+          currentProjectId={project.id}
+          loading={clientProjectsLoading}
+        />
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

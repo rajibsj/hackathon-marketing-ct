@@ -345,7 +345,8 @@ supabase functions deploy meeting-transcript-scan
 ## 11. Related documentation
 
 - [Business overview](./marketing-control-tower-business-overview.md)
-- [Client Retention Copilot feature](./features/client-retention-copilot.md)
+- [Client Retention Copilot architecture](./features/client-retention-copilot-architecture.md)
+- [Client Retention Copilot feature overview](./features/client-retention-copilot.md)
 - [Database schema](./database_schema.md)
 - [AI agent system](./ai_agent_system.md)
 - [Integration points](./integration_points.md)

@@ -1,7 +1,8 @@
 # Client Retention Copilot
 
 > **Last Updated:** 2026-03-20  
-> **Status:** Active
+> **Status:** Active  
+> **Architecture:** See [client-retention-copilot-architecture.md](./client-retention-copilot-architecture.md) for the full technical architecture document.
 
 AI-powered client health monitoring for PMs and account leads. Aggregates delivery signals per client and project, runs Gemini analysis, and surfaces churn risk with recovery recommendations.
 

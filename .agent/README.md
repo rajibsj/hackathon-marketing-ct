@@ -136,7 +136,8 @@ Documentation about the current state of the system - architecture, tech stack, 
   - Searchable assignee selector
   - URL detection and linking in descriptions
   - Real-time cache invalidation
-- **[client-retention-copilot.md](./System/features/client-retention-copilot.md)** - AI Client Retention Copilot (Mar 2026)
+- **[client-retention-copilot-architecture.md](./System/features/client-retention-copilot-architecture.md)** - AI Client Retention Copilot architecture (Mar 2026)
+- **[client-retention-copilot.md](./System/features/client-retention-copilot.md)** - AI Client Retention Copilot feature overview & ops guide
   - ActiveCollab + Control Tower delivery signals
   - Project-mapped meeting transcripts
   - Portfolio analysis, churn risk, recovery tasks
@@ -466,7 +467,8 @@ This documentation structure now includes:
 **New:**
 - `System/marketing-control-tower-architecture.md` — Full architecture document with retention copilot flows
 - `System/marketing-control-tower-business-overview.md` — Business document with personas, workflows, KPIs
-- `System/features/client-retention-copilot.md` — Retention Copilot architecture, data sources, routes, deployment
+- `System/features/client-retention-copilot-architecture.md` — Full architecture document (layers, flows, recovery loop, deployment)
+- `System/features/client-retention-copilot.md` — Feature overview, data sources, routes, deployment checklist
 - Root `README.md` — Setup, demo login, retention copilot workflow and troubleshooting
 
 ### Recent Documentation Updates (Jan 28, 2026)
